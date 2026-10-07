@@ -33,7 +33,8 @@ export function Sidebar(p: Props) {
   }, [p.convs, q, filter, p.agentId]);
   const pinned = !q && filter === 'open' ? shown.filter((c) => c.pinned) : [];
   const rest = !q && filter === 'open' ? shown.filter((c) => !c.pinned) : shown;
-  const unreadTotal = p.convs.reduce((a, c) => a + (c.unread ? 1 : 0), 0);
+  // Unread badge = open conversations only (a long resolved history shouldn't inflate it).
+  const unreadTotal = p.convs.reduce((a, c) => a + (c.unread && c.status !== 'resolved' ? 1 : 0), 0);
 
   return (
     <aside className="sidebar" aria-label="Conversations">
