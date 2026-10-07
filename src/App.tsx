@@ -8,6 +8,8 @@ import { CustomerPanel } from './components/CustomerPanel';
 import { SdPanel } from './components/SdPanel';
 import { PhoneSimulator } from './components/PhoneSimulator';
 import { ding } from './util';
+import { TooltipLayer } from './components/Tooltip';
+import { checkManager } from './data/events';
 
 type Theme = 'system' | 'light' | 'dark';
 export interface Toast { id: number; title: string; body?: string }
@@ -26,6 +28,8 @@ export default function App() {
   const [sound, setSound] = useState(() => localStorage.getItem('via-chat.sound') !== 'off');
   const [simOpen, setSimOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [isManager, setIsManager] = useState(false);
+  useEffect(() => { if (chatwoot) checkManager().then((m) => setIsManager(!!m)); }, []);
   const [composerInsert, setComposerInsert] = useState<{ text: string; n: number } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const selectedRef = useRef(selectedId); selectedRef.current = selectedId;
@@ -120,6 +124,7 @@ export default function App() {
         convs={convs} selectedId={selectedId} onSelect={select} searchRef={searchRef}
         agents={agents} agentId={agentId} onAgent={setAgentId} typing={typing}
         theme={theme} onTheme={cycleTheme} sound={sound} onSound={() => setSound((s) => !s)}
+        manageHref={isManager ? `${import.meta.env.BASE_URL}manage` : undefined}
         signedIn={chatwoot ? { name: chatwoot.currentAgentName, onSignOut: async () => { await signOut(CHATWOOT_BASE, loadSession()); location.reload(); } } : undefined}
       />
       <main className="thread-col" aria-label="Conversation">
@@ -133,7 +138,7 @@ export default function App() {
             insert={composerInsert} toast={toast}
           />
         ) : (
-          <div className="empty-thread"><div className="empty-logo">VIA</div><p>Select a conversation</p></div>
+          <div className="empty-thread"><img className="empty-logo-img" src={`${import.meta.env.BASE_URL}assets/via-logo-trim.png`} alt="" /><p>Select a conversation</p></div>
         )}
       </main>
       {selected && adapter.getServiceDesk && (
@@ -148,6 +153,7 @@ export default function App() {
         />
       )}
       <PhoneSimulator open={simOpen} onToggle={() => setSimOpen((o) => !o)} convs={convs} />
+      <TooltipLayer />
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className="toast"><strong>{t.title}</strong>{t.body && <span>{t.body}</span>}</div>

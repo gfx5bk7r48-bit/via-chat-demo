@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { adapter } from '../store';
 import type { Agent, Conversation, Customer, Message, SavedReply } from '../data/types';
+import { track } from '../data/events';
+import { tip } from './Tooltip';
 
 interface Props { conv: Conversation; agent?: Agent; customer: Customer | null; messages: Message[]; insert: { text: string; n: number } | null }
 
@@ -17,6 +19,9 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
   const canNote = typeof adapter.sendNote === 'function';
   const ta = useRef<HTMLTextAreaElement>(null);
   const lastId = messages.at(-1)?.id;
+  // AI suggestion usage tracking (enums only; never the text itself)
+  const shownKey = useRef<string | null>(null);
+  const fromSuggestion = useRef<{ via: 'use' | 'edit'; text: string } | null>(null);
 
   // AI suggestion: refreshed whenever the thread changes. Never sends by itself.
   useEffect(() => {
@@ -44,7 +49,9 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
     if (!body || !agent) return;
     setText('');
     if (noteMode && adapter.sendNote) { await adapter.sendNote(conv.id, body); setNoteMode(false); return; }
+    const s = fromSuggestion.current; fromSuggestion.current = null;
     await adapter.sendMessage(conv.id, body, agent.id);
+    if (s) track('ai_suggestion_sent', conv.id, { modified: body !== s.text.trim(), via: s.via });
   };
 
   const shown = replies.filter((r) => (r.title + ' ' + r.body).toLowerCase().includes(filter.toLowerCase()));
@@ -78,6 +85,11 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
   };
 
   const showDraft = draft && dismissedFor !== lastId + draft && !text && !noteMode;
+  useEffect(() => {
+    const key = showDraft ? `${conv.id}:${lastId}:${draft}` : null;
+    if (key && shownKey.current !== key) { shownKey.current = key; track('ai_suggestion_shown', conv.id, { source: 'ai-template' }); }
+  }, [showDraft, conv.id, lastId, draft]);
+  useEffect(() => { fromSuggestion.current = null; }, [conv.id]);
   const mineR = shown.filter((r) => r.scope === 'personal');
   const teamR = shown.filter((r) => r.scope === 'team');
 
@@ -85,12 +97,12 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
     <div className="composer-wrap">
       {showDraft && (
         <div className="suggest" role="region" aria-label="AI suggested reply">
-          <span className="ai-tag" title="Generated suggestion — review before sending">✦ AI</span>
+          <span className="ai-tag" {...tip('AI Suggestion', 'Generated draft. Review before sending')} tabIndex={0}>✦ AI</span>
           <span className="suggest-text"><b>Suggested:</b> {draft}</span>
           <span className="suggest-actions">
-            <button onClick={() => { setText(draft!); requestAnimationFrame(() => ta.current?.focus()); }}>Use</button>
-            <button onClick={() => { setText(draft!); requestAnimationFrame(() => { ta.current?.focus(); ta.current?.select(); }); }}>Edit</button>
-            <button onClick={() => setDismissedFor(lastId + draft!)} aria-label="Dismiss suggestion">Dismiss</button>
+            <button {...tip('Use Suggestion', 'Puts it in the message box. Nothing sends until you press Send')} onClick={() => { setText(draft!); fromSuggestion.current = { via: 'use', text: draft! }; track('ai_suggestion_used', conv.id, { source: 'ai-template' }); requestAnimationFrame(() => ta.current?.focus()); }}>Use</button>
+            <button {...tip('Edit Suggestion', 'Puts it in the box with the text selected so you can rewrite it')} onClick={() => { setText(draft!); fromSuggestion.current = { via: 'edit', text: draft! }; track('ai_suggestion_edited', conv.id, { source: 'ai-template' }); requestAnimationFrame(() => { ta.current?.focus(); ta.current?.select(); }); }}>Edit</button>
+            <button {...tip('Dismiss Suggestion', 'Hide it until the customer writes again')} onClick={() => { setDismissedFor(lastId + draft!); track('ai_suggestion_dismissed', conv.id, { source: 'ai-template' }); }}>Dismiss</button>
           </span>
         </div>
       )}
@@ -117,8 +129,8 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
                 {mineR.map((r) => (
                   <div key={r.id} className={`reply ${shown.indexOf(r) === active ? 'act' : ''}`}>
                     <button className="reply-main" onClick={() => pick(r)}><b>{r.title}</b><span>{r.body}</span></button>
-                    <button className="tiny" onClick={() => setEditing(r)} aria-label={`Edit ${r.title}`}>Edit</button>
-                    <button className="tiny danger" onClick={async () => { await adapter.deleteSavedReply(r.id); void loadReplies(); }} aria-label={`Delete ${r.title}`}>Delete</button>
+                    <button className="tiny" onClick={() => setEditing(r)} {...tip(`Edit “${r.title}”`)}>Edit</button>
+                    <button className="tiny danger" onClick={async () => { await adapter.deleteSavedReply(r.id); void loadReplies(); }} {...tip(`Delete “${r.title}”`)}>Delete</button>
                   </div>
                 ))}
                 <div className="replies-sec">Team</div>
@@ -134,19 +146,19 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
       )}
 
       <div className={`composer ${noteMode ? 'note-mode' : ''}`}>
-        <button className={`icon-btn plus ${menuOpen ? 'on' : ''}`} onClick={() => { setMenuOpen((o) => !o); setEditing(null); }} aria-label="Saved replies (type / )" aria-expanded={menuOpen} title="Saved replies ( / )">
+        <button className={`icon-btn plus ${menuOpen ? 'on' : ''}`} onClick={() => { setMenuOpen((o) => !o); setEditing(null); }} {...tip('Preset Messages', 'Saved replies · or type / in the message box')} aria-expanded={menuOpen}>
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="currentColor" /></svg>
         </button>
         {canNote && (
           <button className={`icon-btn note-btn ${noteMode ? 'on' : ''}`} onClick={() => { setNoteMode((n) => !n); requestAnimationFrame(() => ta.current?.focus()); }}
-            aria-pressed={noteMode} aria-label="Private team note (not sent to the customer)" title="Private team note">
+            aria-pressed={noteMode} {...tip(noteMode ? 'Back to Text Message' : 'Private Team Note', 'Only VIA sees notes. They are never texted to the customer')}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 3h10l4 4v14H5z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /><path d="M8 11h8M8 15h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
           </button>
         )}
         <div className="field">
           <textarea ref={ta} rows={1} value={text} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey}
             placeholder={noteMode ? 'Private note · only VIA sees this' : conv.status === 'resolved' ? 'Text Message · reopens conversation' : 'Text Message'} aria-label="Message. Enter to send, Shift+Enter for a new line, / for saved replies" />
-          <button className="send" onClick={send} disabled={!text.trim()} aria-label="Send">
+          <button className="send" onClick={send} disabled={!text.trim()} {...tip(noteMode ? 'Add Note' : 'Send', 'Enter')}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>

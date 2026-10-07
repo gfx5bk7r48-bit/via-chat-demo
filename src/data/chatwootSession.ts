@@ -49,6 +49,7 @@ export async function signIn(baseUrl: string, email: string, password: string): 
   let body: any = null;
   try { body = await r.json(); } catch { /* non-JSON error */ }
   if (!r.ok) {
+    if (r.status === 429) throw new Error("Too many sign-in attempts. Please wait a few minutes and try again.");
     const msg = body?.errors?.[0] ?? body?.error ?? body?.message ?? `Sign-in failed (${r.status})`;
     throw new Error(typeof msg === 'string' ? msg : 'Sign-in failed');
   }

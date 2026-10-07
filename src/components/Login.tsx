@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { signIn } from '../data/chatwootSession';
 import { CHATWOOT_BASE } from '../store';
+import { Logo } from './Logo';
 
 /** Sign-in screen for the self-hosted build. Uses the agent's own Chatwoot account. */
 export function Login({ onSignedIn }: { onSignedIn: () => void }) {
@@ -20,7 +21,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
   return (
     <div className="login">
       <form className="login-card" onSubmit={submit} aria-label="Sign in">
-        <div className="login-brand"><span className="brand-mark">VIA</span> Chat</div>
+        <div className="login-brand"><Logo height={40} /> <span className="brand-word">Chat</span></div>
         <p className="muted small">Sign in with your VIA Chat (Chatwoot) account.</p>
         <label>Email<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
         <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>

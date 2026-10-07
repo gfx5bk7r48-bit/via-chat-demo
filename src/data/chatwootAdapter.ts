@@ -46,6 +46,7 @@ const PERSONAL_KEY = 'via_personal_replies_json';
 const TAPBACK_KEY = 'via_tapbacks_json';
 const PIN_LABEL = 'pinned';
 const POLL_MS = 4000;
+const RESOLVED_PAGES = 4; // most recent 100 resolved conversations in the Resolved tab
 
 export function fmtPhone(e164?: string | null): string {
   const d = (e164 ?? '').replace(/\D/g, '');
@@ -188,15 +189,26 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
     return list.map((a) => ({ id: String(a.id), name: a.available_name || a.name, initials: initialsOf(a.available_name || a.name) }));
   }
 
+  /**
+   * Every open / pending / snoozed conversation, plus the most recently active resolved ones
+   * (RESOLVED_PAGES × 25). Page 1 of each status tells us the total, then the rest load in parallel,
+   * so a long history (e.g. the demo seed) doesn't mean dozens of sequential requests.
+   */
   async listConversations(): Promise<Conversation[]> {
-    const out: Conversation[] = [];
-    for (let page = 1; page <= 20; page++) {
-      const r = await this.req('GET', this.acct(`/conversations?status=all&assignee_type=all&page=${page}`));
-      const payload: Raw[] = r?.data?.payload ?? [];
-      out.push(...payload.map((c) => this.mapConversation(c)));
-      if (payload.length < 25) break;
-    }
-    return out.sort((a, b) => (b.lastMessage?.at ?? 0) - (a.lastMessage?.at ?? 0));
+    const pageOf = (status: string, page: number) =>
+      this.req('GET', this.acct(`/conversations?status=${status}&assignee_type=all&sort_by=last_activity_at_desc&page=${page}`)) as Promise<Raw>;
+    const fetchStatus = async (status: string, maxPages: number): Promise<Raw[]> => {
+      const first = await pageOf(status, 1);
+      const rows: Raw[] = first?.data?.payload ?? [];
+      const total = Number(first?.data?.meta?.all_count ?? rows.length);
+      const pages = Math.min(maxPages, Math.ceil(total / 25));
+      const rest = await Promise.all(Array.from({ length: Math.max(0, pages - 1) }, (_, i) => pageOf(status, i + 2).then((r) => (r?.data?.payload ?? []) as Raw[])));
+      return rows.concat(...rest);
+    };
+    const groups = await Promise.all([fetchStatus('open', 40), fetchStatus('pending', 40), fetchStatus('snoozed', 40), fetchStatus('resolved', RESOLVED_PAGES)]);
+    const seen = new Map<string, Conversation>();
+    for (const c of groups.flat()) { const m = this.mapConversation(c); seen.set(m.id, m); }
+    return [...seen.values()].sort((a, b) => (b.lastMessage?.at ?? 0) - (a.lastMessage?.at ?? 0));
   }
 
   async getMessages(conversationId: string): Promise<Message[]> {

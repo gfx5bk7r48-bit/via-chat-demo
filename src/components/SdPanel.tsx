@@ -3,6 +3,8 @@ import { adapter } from '../store';
 import type { Conversation } from '../data/types';
 import { customerWindow, dow as dowShort, longDay, md, namesOn, verdict, weekday, windowPart, type SdAppointment, type SdLookup, type SdRouting } from '../data/sd';
 import { Avatar } from './Avatar';
+import { tip } from './Tooltip';
+import { track } from '../data/events';
 
 interface Props {
   open: boolean; conv: Conversation; refreshKey?: string; onClose: () => void;
@@ -60,15 +62,17 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
   const synced = minsAgo(sd?.synced_at);
   const stale = !!sd?.warning || (!live && synced != null && synced > 45);
 
-  const eta = (m: number) => { onInsert(`${first ? `Hi ${first}, ` : 'Hi! '}your VIA technician is on the way and should arrive in about ${m} minutes.`); setAction(null); };
+  const eta = (m: number) => { track('quick_eta', conv.id, { minutes: m }); onInsert(`${first ? `Hi ${first}, ` : 'Hi! '}your VIA technician is on the way and should arrive in about ${m} minutes.`); setAction(null); };
   // Customer-facing offers never quote the 8-12 / 12-4 buckets.
   const offer = (day: string, part: 'morning' | 'afternoon') => {
+    track('quick_offer_day', conv.id, { part });
     onInsert(`We have an opening ${day} in the ${part}. Dispatch will text you a 3-hour arrival window the day before. Would that work for you?`);
     setAction(null);
   };
   const doBook = async () => {
     if (!book.date || !book.window || !book.appliance) return;
     const { callsheetId } = await adapter.bookAppointment({ conversationId: conv.id, date: book.date, window: book.window, appliance: book.appliance, issue: book.issue });
+    track('quick_book', conv.id);
     toast(`Demo booking ${callsheetId} noted`, 'Private note added. Nothing was sent to ServiceDesk.');
     setAction(null); setBook({ date: '', window: '', appliance: '', issue: '' });
     adapter.getServiceDesk?.(conv.phone).then(setSd);
@@ -77,7 +81,7 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
   return (
     <aside className={`panel ${open ? 'open' : ''}`} aria-label="Customer details" aria-hidden={!open}>
       <div className="panel-inner">
-        <button className="panel-close" onClick={onClose} aria-label="Close customer panel">Done</button>
+        <button className="panel-close" onClick={onClose} {...tip('Close Customer Details')}>Done</button>
         <div className="panel-hero">
           <Avatar name={conv.name || head?.customer_full_name} phone={conv.phone} size={64} />
           <h2>{conv.name || (names.length === 1 ? head?.customer_full_name : '') || (names.length > 1 ? 'Shared number' : 'Unknown customer')}</h2>
@@ -98,14 +102,14 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
         {sd?.error && <p className="sd-warn stale">{sd.error}</p>}
 
         <div className="actions">
-          <button className={action === 'eta' ? 'on' : ''} onClick={() => setAction(action === 'eta' ? null : 'eta')}><span>⏱</span>Send ETA</button>
-          <button className={action === 'offer' ? 'on' : ''} onClick={() => setAction(action === 'offer' ? null : 'offer')}><span>📅</span>Offer a day</button>
-          <button className={action === 'book' ? 'on' : ''} onClick={() => setAction(action === 'book' ? null : 'book')}><span>＋</span>Book (demo)</button>
+          <button className={action === 'eta' ? 'on' : ''} onClick={() => setAction(action === 'eta' ? null : 'eta')} {...tip('Send ETA', 'Inserts “your tech arrives in about N minutes” into the message box')}><span>⏱</span>Send ETA</button>
+          <button className={action === 'offer' ? 'on' : ''} onClick={() => setAction(action === 'offer' ? null : 'offer')} {...tip('Offer a Day', 'Pick an open morning or afternoon and insert the offer text')}><span>📅</span>Offer a day</button>
+          <button className={action === 'book' ? 'on' : ''} onClick={() => setAction(action === 'book' ? null : 'book')} {...tip('Book (demo)', 'Records a private booking note. Nothing is sent to ServiceDesk')}><span>＋</span>Book (demo)</button>
         </div>
 
         {action === 'eta' && (
           <div className="card act-card"><div className="card-h">Insert ETA text</div>
-            <div className="seg3">{[15, 30, 45].map((m) => <button key={m} onClick={() => eta(m)}>{m} min</button>)}</div></div>
+            <div className="seg3">{[15, 30, 45].map((m) => <button key={m} onClick={() => eta(m)} {...tip(`Insert ${m}-minute ETA`)}>{m} min</button>)}</div></div>
         )}
         {(action === 'offer' || action === 'book') && (
           <div className="card act-card">

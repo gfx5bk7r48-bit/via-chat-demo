@@ -1,6 +1,6 @@
 :root {
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --accent: #0a7cff; --accent-2: #e8412c; /* VIA accent */
+  --accent: #0a7cff; --accent-2: #d32228; /* VIA red, sampled from the logo's stripes */ --via-red: #d32228;
   --bg: #ffffff; --side: #f5f5f7; --side-sel: #0a7cff; --line: rgba(60,60,67,.14);
   --text: #1d1d1f; --muted: #86868b; --in: #e9e9eb; --in-text: #000; --out: #0a7cff; --out-text: #fff;
   --field: rgba(118,118,128,.12); --card: #f5f5f7; --panel: #fbfbfd; --hover: rgba(0,0,0,.05);
@@ -36,6 +36,7 @@ button { cursor: pointer; }
 .sidebar { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
 .side-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 6px; }
 .brand { font-weight: 700; font-size: 17px; letter-spacing: -.01em; display: flex; align-items: center; gap: 6px; }
+.brand-word { line-height: 1; }
 .brand-mark { background: var(--accent-2); color: #fff; font-size: 11px; font-weight: 800; padding: 3px 5px; border-radius: 6px; letter-spacing: .04em; }
 .badge { background: var(--accent); color: #fff; font-size: 11px; border-radius: 10px; padding: 1px 7px; font-weight: 600; }
 .side-tools { display: flex; gap: 2px; }
@@ -304,3 +305,28 @@ button.primary.small { padding: 4px 10px; font-size: 12px; }
 .sd-appt-name { font-size: 12px; font-weight: 600; }
 .sd-problem { color: var(--muted); font-style: italic; font-size: 12px; }
 .demo-badge { background: var(--chip-amber); color: var(--chip-amber-t); border-radius: 5px; padding: 0 5px; }
+
+/* ---------- VIA logo ---------- */
+.via-logo { display: inline-flex; align-items: center; border-radius: 7px; padding: 0 2px; flex: none; }
+.via-logo img { display: block; height: 100%; width: auto; max-height: calc(100% - 6px); user-select: none; }
+/* Dark mode: the logo's black outline vanishes on dark grey, so it sits on a soft light plate. */
+:root[data-theme="dark"] .via-logo { background: linear-gradient(#f4f4f6, #e6e6ea); padding: 0 6px; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 1px 3px rgba(0,0,0,.35); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .via-logo { background: linear-gradient(#f4f4f6, #e6e6ea); padding: 0 6px; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 1px 3px rgba(0,0,0,.35); } }
+.brand { gap: 7px; }
+.login-brand { gap: 10px; font-size: 26px; justify-content: center; }
+.empty-logo-img { width: 120px; opacity: .18; filter: grayscale(1); margin: 0 auto 10px; }
+.manage-link { text-decoration: none; }
+
+/* ---------- Tooltips (components/Tooltip.tsx) ---------- */
+.tooltip { position: fixed; z-index: 1000; transform: translate(-50%, -100%); pointer-events: none; max-width: 240px;
+  background: color-mix(in srgb, #1d1d1f 92%, transparent); color: #fff; backdrop-filter: blur(12px) saturate(1.6); -webkit-backdrop-filter: blur(12px) saturate(1.6);
+  font-size: 12px; line-height: 1.3; padding: 5px 9px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.22); animation: tip-in .14s ease-out; text-align: center; }
+.tooltip.below { transform: translate(-50%, 0); }
+.tooltip b { font-weight: 600; display: block; white-space: nowrap; }
+.tooltip span { display: block; opacity: .78; font-size: 11px; margin-top: 1px; }
+:root[data-theme="dark"] .tooltip { background: color-mix(in srgb, #f5f5f7 94%, transparent); color: #1d1d1f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tooltip { background: color-mix(in srgb, #f5f5f7 94%, transparent); color: #1d1d1f; } }
+@keyframes tip-in { from { opacity: 0; margin-top: 3px; } to { opacity: 1; margin-top: 0; } }
+@media (hover: none) { .tooltip { display: none; } }
+@media (prefers-reduced-motion: reduce) { .tooltip { animation: none; } }
+.mg-loading { display: grid; place-items: center; height: 100%; color: var(--muted); }

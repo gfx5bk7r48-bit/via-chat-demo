@@ -2,6 +2,8 @@ import { useMemo, useState, type RefObject } from 'react';
 import type { Agent, Conversation } from '../data/types';
 import { Avatar } from './Avatar';
 import { listTime } from '../util';
+import { tip } from './Tooltip';
+import { Logo } from './Logo';
 
 interface Props {
   convs: Conversation[]; selectedId: string | null; onSelect: (id: string) => void;
@@ -9,6 +11,8 @@ interface Props {
   typing: Record<string, boolean>; theme: string; onTheme: () => void; sound: boolean; onSound: () => void;
   /** Real backend: the agent is whoever signed in; no switcher. */
   signedIn?: { name: string; onSignOut: () => void };
+  /** Shown only when the server says this user is a manager (GET /api/analytics/whoami = 200). */
+  manageHref?: string;
 }
 type Filter = 'open' | 'mine' | 'resolved';
 
@@ -34,12 +38,15 @@ export function Sidebar(p: Props) {
   return (
     <aside className="sidebar" aria-label="Conversations">
       <div className="side-top">
-        <div className="brand"><span className="brand-mark">VIA</span> Chat{unreadTotal > 0 && <span className="badge" aria-label={`${unreadTotal} unread`}>{unreadTotal}</span>}</div>
+        <div className="brand"><Logo /> <span className="brand-word">Chat</span>{unreadTotal > 0 && <span className="badge" aria-label={`${unreadTotal} unread`}>{unreadTotal}</span>}</div>
         <div className="side-tools">
-          <button className="icon-btn" onClick={p.onSound} aria-label={p.sound ? 'Mute notification sound' : 'Unmute notification sound'} title={p.sound ? 'Sound on' : 'Sound off'}>
+          {p.manageHref && <a className="icon-btn manage-link" href={p.manageHref} {...tip('Manager Dashboard', 'Team analytics (managers only)')}>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none" /></svg>
+          </a>}
+          <button className="icon-btn" onClick={p.onSound} aria-pressed={p.sound} {...tip('Notifications', p.sound ? 'Sound on · click to mute' : 'Sound off · click to unmute')}>
             {p.sound ? '🔔' : '🔕'}
           </button>
-          <button className="icon-btn" onClick={p.onTheme} aria-label={`Theme: ${p.theme}. Click to change`} title={`Theme: ${p.theme}`}>
+          <button className="icon-btn" onClick={p.onTheme} {...tip('Light / Dark Mode', `Now: ${p.theme === 'system' ? 'match system' : p.theme}`)}>
             {p.theme === 'dark' ? '🌙' : p.theme === 'light' ? '☀️' : '◐'}
           </button>
         </div>
@@ -47,7 +54,7 @@ export function Sidebar(p: Props) {
       {p.signedIn ? (
         <div className="agent-switch signed-in">
           <span title="Signed in with Chatwoot">{p.signedIn.name} · Dispatch</span>
-          <button className="link-btn" onClick={p.signedIn.onSignOut}>Sign out</button>
+          <button className="link-btn" onClick={p.signedIn.onSignOut} {...tip('Sign Out')}>Sign out</button>
         </div>
       ) : (
         <label className="agent-switch">
@@ -61,7 +68,7 @@ export function Sidebar(p: Props) {
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="2.4" fill="none" /><path d="M15.5 15.5 21 21" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
         <input ref={p.searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search conversations (Ctrl+K)"
           onKeyDown={(e) => { if (e.key === 'Escape') { setQ(''); e.currentTarget.blur(); } if (e.key === 'Enter' && shown[0]) p.onSelect(shown[0].id); }} />
-        <kbd>⌘K</kbd>
+        <kbd {...tip('Search shortcut', 'Ctrl/⌘ + K')}>⌘K</kbd>
       </div>
       <div className="segmented" role="tablist" aria-label="Filter">
         {(['open', 'mine', 'resolved'] as Filter[]).map((f) => (

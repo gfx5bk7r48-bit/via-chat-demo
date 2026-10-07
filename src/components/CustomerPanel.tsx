@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { tip } from './Tooltip';
 import { adapter } from '../store';
 import type { Conversation, Customer, Job, Slot } from '../data/types';
 import { Avatar } from './Avatar';
@@ -52,7 +53,7 @@ export function CustomerPanel({ open, conv, customer: c, onClose, onInsert, toas
   return (
     <aside className={`panel ${open ? 'open' : ''}`} aria-label="Customer details" aria-hidden={!open}>
       <div className="panel-inner">
-        <button className="panel-close" onClick={onClose} aria-label="Close customer panel">Done</button>
+        <button className="panel-close" onClick={onClose} {...tip('Close Customer Details')}>Done</button>
         <div className="panel-hero">
           <Avatar name={c?.name || conv.name} phone={conv.phone} size={72} />
           <h2>{c?.name || 'Unknown customer'}</h2>
@@ -64,9 +65,9 @@ export function CustomerPanel({ open, conv, customer: c, onClose, onInsert, toas
         </div>
 
         <div className="actions">
-          <button className={action === 'eta' ? 'on' : ''} onClick={() => setAction(action === 'eta' ? null : 'eta')}><span>⏱</span>Send ETA</button>
-          <button className={action === 'avail' ? 'on' : ''} onClick={() => setAction(action === 'avail' ? null : 'avail')}><span>📅</span>Availability</button>
-          <button className={action === 'book' ? 'on' : ''} onClick={() => setAction(action === 'book' ? null : 'book')}><span>＋</span>Book</button>
+          <button className={action === 'eta' ? 'on' : ''} onClick={() => setAction(action === 'eta' ? null : 'eta')} {...tip('Send ETA', 'Inserts “your tech arrives in about N minutes” into the message box')}><span>⏱</span>Send ETA</button>
+          <button className={action === 'avail' ? 'on' : ''} onClick={() => setAction(action === 'avail' ? null : 'avail')} {...tip('Availability', 'Open mornings and afternoons for this ZIP')}><span>📅</span>Availability</button>
+          <button className={action === 'book' ? 'on' : ''} onClick={() => setAction(action === 'book' ? null : 'book')} {...tip('Book', 'Create a demo callsheet')}><span>＋</span>Book</button>
         </div>
 
         {action === 'eta' && (

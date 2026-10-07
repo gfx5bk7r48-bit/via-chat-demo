@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { tip } from './Tooltip';
 import { adapter } from '../store';
 import type { Agent, Conversation, Customer, Message, Tapback } from '../data/types';
 import { Avatar } from './Avatar';
@@ -61,7 +62,7 @@ export function Thread(p: Props) {
   return (
     <div className="thread">
       <header className="thread-head">
-        <button className="back" onClick={p.onBack} aria-label="Back to conversations">‹<span>Chats</span></button>
+        <button className="back" onClick={p.onBack} {...tip('Back to Conversations')}>‹<span>Chats</span></button>
         <div className="who">
           <Avatar name={p.conv.name} phone={p.conv.phone} size={30} />
           <div><div className="who-name">{p.conv.name || p.conv.phone}</div>
@@ -76,8 +77,8 @@ export function Thread(p: Props) {
           ) : (
             <button className="pill" onClick={() => adapter.setStatus(p.conv.id, 'open')}>Reopen</button>
           )}
-          <button className="icon-btn pin-btn" onClick={() => adapter.togglePin(p.conv.id)} aria-label={p.conv.pinned ? 'Unpin' : 'Pin'} title={p.conv.pinned ? 'Unpin' : 'Pin'}>📌</button>
-          <button className={`icon-btn info ${p.panelOpen ? 'on' : ''}`} onClick={p.onTogglePanel} aria-label="Toggle customer info (Ctrl+I)" aria-pressed={p.panelOpen} title="Customer info">ⓘ</button>
+          <button className="icon-btn pin-btn" onClick={() => adapter.togglePin(p.conv.id)} {...tip(p.conv.pinned ? 'Unpin Conversation' : 'Pin Conversation', p.conv.pinned ? undefined : 'Keeps it at the top of the list')}>📌</button>
+          <button className={`icon-btn info ${p.panelOpen ? 'on' : ''}`} onClick={p.onTogglePanel} aria-pressed={p.panelOpen} {...tip('Customer Details', 'Ctrl/⌘+I')}>ⓘ</button>
         </div>
       </header>
 
@@ -125,7 +126,7 @@ export function Thread(p: Props) {
                   onPointerUp={() => clearTimeout(press.current)} onPointerLeave={() => clearTimeout(press.current)}
                 >
                   {m.attachment && (
-                    <button className="img-btn" onClick={() => setLightbox(m)} aria-label={`Open photo: ${m.attachment.alt}`}>
+                    <button className="img-btn" onClick={() => setLightbox(m)} {...tip('Open Photo')} aria-label={`Open photo: ${m.attachment.alt}`}>
                       <img src={m.attachment.url} alt={m.attachment.alt} draggable={false} />
                     </button>
                   )}
@@ -152,7 +153,7 @@ export function Thread(p: Props) {
           <div className={`tapback-menu ${menu.out ? 'out' : 'in'}`} style={{ top: Math.max(4, menu.y - 52), [menu.out ? 'right' : 'left']: menu.out ? `calc(100% - ${menu.x}px)` : menu.x }} role="menu" aria-label="Tapback">
             {TAPBACKS.map((t) => {
               const on = p.messages.find((x) => x.id === menu.id)?.meta?.tapbacks?.includes(t.k);
-              return <button key={t.k} role="menuitem" className={`${on ? 'on' : ''} ${t.k === 'ha' ? 'ha' : ''}`} onClick={() => react(t.k)} aria-label={t.label} autoFocus={t.k === 'heart'}>{t.icon}</button>;
+              return <button key={t.k} role="menuitem" className={`${on ? 'on' : ''} ${t.k === 'ha' ? 'ha' : ''}`} onClick={() => react(t.k)} {...tip(`Tapback: ${t.label}`, 'Only VIA sees tapbacks')} autoFocus={t.k === 'heart'}>{t.icon}</button>;
             })}
             <span className="tb-note">Team-only · not sent via SMS</span>
           </div>

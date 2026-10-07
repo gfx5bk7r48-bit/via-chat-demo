@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { tip } from './Tooltip';
 import { adapter, simulator } from '../store';
 import type { Conversation, Message } from '../data/types';
 import { errorCodePhoto } from '../data/svg';
@@ -50,7 +51,7 @@ export function PhoneSimulator({ open, onToggle, convs }: { open: boolean; onTog
 
   return (
     <>
-      <button className={`sim-fab ${open ? 'on' : ''}`} onClick={onToggle} aria-expanded={open} aria-label="Customer phone simulator">
+      <button className={`sim-fab ${open ? 'on' : ''}`} onClick={onToggle} aria-expanded={open} {...tip('Pretend Customer Phone (demo)', 'Text the inbox as a customer would')}>
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3" stroke="currentColor" strokeWidth="2" fill="none" /><circle cx="12" cy="18" r="1" fill="currentColor" /></svg>
         Customer phone
       </button>
@@ -63,7 +64,7 @@ export function PhoneSimulator({ open, onToggle, convs }: { open: boolean; onTog
                 {!convs.some((c) => c.phone === NEW_NUMBER) && <option value={NEW_NUMBER}>New number — {NEW_NUMBER}</option>}
               </select>
             </label>
-            <button className="icon-btn" onClick={onToggle} aria-label="Close simulator">✕</button>
+            <button className="icon-btn" onClick={onToggle} {...tip('Close Phone')}>✕</button>
           </div>
           <div className="iphone">
             <div className="island" />
@@ -83,9 +84,9 @@ export function PhoneSimulator({ open, onToggle, convs }: { open: boolean; onTog
               <div ref={end} />
             </div>
             <div className="ios-compose">
-              <button className="ios-cam" onClick={() => send(true)} aria-label="Send a photo of an error code" title="Send photo">📷</button>
+              <button className="ios-cam" onClick={() => send(true)} {...tip('Attach Photo (demo)', 'Sends a sample error-code photo as the customer')}>📷</button>
               <input value={text} onChange={(e) => onType(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} placeholder="Text Message • SMS" aria-label="Type as the customer" />
-              <button className="ios-send" onClick={() => send()} disabled={!text.trim()} aria-label="Send as customer">↑</button>
+              <button className="ios-send" onClick={() => send()} disabled={!text.trim()} {...tip('Send as Customer')}>↑</button>
             </div>
           </div>
           <p className="sim-hint">Messages you send here arrive live in the dashboard. Tapbacks never show on the customer’s phone.</p>
