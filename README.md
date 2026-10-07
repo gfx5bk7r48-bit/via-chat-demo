@@ -59,7 +59,7 @@ A lazy-loaded analytics view for VIA managers (`src/manage/`). Same look as the 
 - **Access:** the inbox shows a *Manager Dashboard* icon only when `GET /api/analytics/whoami` returns 200. The real check is server-side in the private analytics service: the signed-in Chatwoot user must be an **administrator** of the account (or on the service's manager email allowlist). Agents get **403** from every `/api/analytics/*` endpoint and a "Managers only" page if they open the URL.
 - **Filters:** Today / 7 / 30 / 90 days / custom range, agent, inbox, label. Every number is compared with the prior period of equal length. All times are Eastern.
 - **Business hours vs. wall clock** switch for response-time metrics (default Mon–Sat 8am–5pm ET, editable in Settings with holidays).
-- Sections: KPI tiles, volume over time, hour × weekday heatmap, new vs. returning customers, responsiveness (FRT median/p90, reply time, time to resolve), agent leaderboard, outcomes and labels, bookings proxy, AI suggestions and quick actions, Ray handoffs, SMS cost (**placeholder**), live view (presence, open by agent, waiting, unassigned).
+- Sections: KPI tiles, volume over time, hour × weekday heatmap, new vs. returning customers, responsiveness (FRT median/p90, reply time, time to resolve), agent leaderboard, outcomes and labels, bookings proxy, AI suggestions and quick actions, Ray handoffs, messaging charges (messages × $0.025, rate set by LockStep), a LockStep-internal cost/margin card that the server only sends to LockStep users, live view (presence, open by agent, waiting, unassigned).
 - **CSV export** on every table/chart card (UTF-8 with BOM for Excel; cells that look like formulas are escaped).
 - Charts are plain SVG (no chart library).
 

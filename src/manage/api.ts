@@ -19,7 +19,7 @@ export async function api<T>(path: string, init?: { method?: string; body?: unkn
 
 export interface Kpis {
   inbound: number; outbound: number; automated: number; notes: number; new_conversations: number; active_conversations: number; customers: number;
-  new_customers: number; returning_customers: number; segments_in: number; segments_out: number;
+  new_customers: number; returning_customers: number; messages_in: number; messages_out: number;
   frt_median: number | null; frt_p90: number | null; frt_median_biz: number | null; frt_p90_biz: number | null; frt_answered: number; frt_unanswered: number;
   reply_mean: number | null; reply_median: number | null; reply_mean_biz: number | null; reply_median_biz: number | null; replies: number;
   resolution_median: number | null; resolution_p90: number | null; resolution_median_biz: number | null; resolution_p90_biz: number | null;
@@ -36,14 +36,17 @@ export interface Overview {
   range: { from: string; to: string; bucket: 'hour' | 'day' | 'week'; days: number; prev_from: string; prev_to: string };
   business_hours: Schedule;
   current: {
-    kpis: Kpis; status: Record<string, number>; status_total: number; events: EventsBlock; sms_cost: { segments: number; estimate: number; rate: number; placeholder: boolean };
-    series: { b: string; inbound: number; outbound: number; automated: number; conversations: number; new_customers: number; returning_customers: number }[];
+    kpis: Kpis; status: Record<string, number>; status_total: number; events: EventsBlock;
+    charges: Charge & { rate_per_message: number; currency: string; unit: 'message'; by_bucket: (Charge & { b: string })[]; by_agent: { user_id: number; messages_out: number; amount: number }[] };
+    series: { b: string; inbound: number; outbound: number; automated: number; messages_in: number; messages_out: number; conversations: number; new_customers: number; returning_customers: number }[];
     heatmap: { dow: number; hour: number; inbound: number; outbound: number }[];
     labels: { label: string; conversations: number; share: number | null }[];
     frt_hist: { label: string; wall: number; business: number }[];
     agents: AgentRow[]; booked: number[];
   };
-  previous: { kpis: Kpis; status: Record<string, number>; events: EventsBlock; sms_cost: { segments: number; estimate: number } };
+  previous: { kpis: Kpis; status: Record<string, number>; events: EventsBlock; charges: Charge };
+  /** Present only for LockStep-internal users (the server omits it for everyone else). */
+  internal?: { cost_rate_per_segment: number; revenue_rate_per_message: number; current: InternalBlock; previous: InternalBlock; by_bucket: { b: string; messages: number; segments: number; revenue: number; cost: number; margin: number }[] };
 }
 export interface Meta { agents: { id: number; name: string; role: string }[]; inboxes: { id: number; name: string; channel_type: string }[]; labels: { title: string; color: string }[]; account_id: number }
 export interface Live {
@@ -54,4 +57,6 @@ export interface Live {
   unassigned: { display_id: number; inbox_id: number; status: string; name: string | null; phone_number: string | null; created_at: number; last_at: number | null }[];
 }
 export interface Schedule { tz: string; days: Record<string, [number, number] | null>; holidays: string[] }
-export interface Settings { business_hours: Schedule; sms: { rate_per_segment: number; currency: string; note: string } }
+export interface Charge { messages_in: number; messages_out: number; messages: number; amount: number }
+export interface InternalBlock { segments_in: number; segments_out: number; segments: number; cost: number; revenue: number; margin: number; margin_pct: number | null }
+export interface Settings { business_hours: Schedule; billing: { rate_per_message: number; currency: string }; can_edit_rates: boolean; internal_cost?: { rate_per_segment: number; currency: string } }

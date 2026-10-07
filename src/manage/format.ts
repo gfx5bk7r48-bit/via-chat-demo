@@ -9,6 +9,8 @@ export function addDays(day: string, n: number) {
 export const nf = new Intl.NumberFormat('en-US');
 export const num = (v: number | null | undefined) => (v == null ? '—' : nf.format(Math.round(v)));
 export const pct = (v: number | null | undefined, digits = 0) => (v == null ? '—' : `${(v * 100).toFixed(digits)}%`);
+export const usd = (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const rateStr = (v: number) => `$${String(+Number(v).toFixed(4))}`;
 export const money = (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: v < 100 ? 2 : 0 });
 export function dur(sec: number | null | undefined): string {
   if (sec == null || !isFinite(sec)) return '—';

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, HttpError, type Live, type Meta, type Overview, type Settings, type Kpis } from './api';
-import { addDays, bucketLabel, delta, downloadCsv, dur, etStamp, maskPhone, money, num, pct, prettyDay, todayET, DOW, hourLabel } from './format';
+import { addDays, bucketLabel, delta, downloadCsv, dur, etStamp, maskPhone, num, pct, prettyDay, rateStr, todayET, usd, DOW, hourLabel } from './format';
 import { HBars, Heatmap, SplitBar, TimeChart } from './charts';
 import { Logo } from '../components/Logo';
 import { tip, TooltipLayer } from '../components/Tooltip';
@@ -104,7 +104,7 @@ export default function Manage({ onSignedOut }: { onSignedOut: () => void }) {
           <button className="icon-btn" onClick={() => { load(); loadLive(); }} {...tip('Refresh', 'Numbers are cached for up to 60 s')} disabled={loading}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" className={loading ? 'spin' : ''}><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button className="icon-btn" onClick={() => setSettingsOpen(true)} {...tip('Settings', 'Business hours and SMS rate')}>
+          <button className="icon-btn" onClick={() => setSettingsOpen(true)} {...tip('Settings', 'Business hours and message rate')}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="2" fill="none" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
           </button>
           <button className="icon-btn" onClick={cycleTheme} {...tip('Light / Dark Mode', `Now: ${theme === 'system' ? 'match system' : theme}`)}>{theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : '◐'}</button>
@@ -283,14 +283,37 @@ export default function Manage({ onSignedOut }: { onSignedOut: () => void }) {
             </div>
             <p className="muted small">Ray (voice agent) isn&apos;t connected yet; the demo history includes synthetic handoff notes in the same format the inbox shows.</p>
           </Card>
-          <Card title="SMS cost estimate" info="PLACEHOLDER until Twilio is connected: estimated segments × the rate in Settings. GSM-7 texts are 160 chars per segment (153 when split), anything with emoji/Unicode is 70 (67).">
-            <div className="mg-placeholder">Placeholder · no Twilio yet</div>
+          <Card title="Messaging charges" info="One message = one text received from a customer or one reply sent by an agent. Private team notes, activity lines, automated messages and anything marked Not Delivered aren't counted."
+            csv={() => {
+              const ch = cur.charges;
+              const rows: (string | number)[][] = ch.by_bucket.map((b) => ['period', bucketLabel(b.b, data.range.bucket) + ' ET', b.b, b.messages_in, b.messages_out, b.messages, b.amount.toFixed(2)]);
+              ch.by_agent.filter((a) => a.messages_out > 0).forEach((a) => rows.push(['agent (replies sent)', agentName(a.user_id), '', '', a.messages_out, a.messages_out, a.amount.toFixed(2)]));
+              rows.push(['total', `${data.range.from} – ${data.range.to}`, '', ch.messages_in, ch.messages_out, ch.messages, ch.amount.toFixed(2)]);
+              downloadCsv(`via-messaging-charges-${data.range.from}_${data.range.to}.csv`, ['row', 'period_or_agent', 'bucket_start_et', 'messages_in', 'messages_out', 'messages', `charge_usd_at_${ch.rate_per_message}`], rows);
+            }}>
             <div className="mg-stat-row">
-              <Stat label="Segments (in + out)" value={num(cur.sms_cost.segments)} sub={`prior ${num(prev.sms_cost.segments)}`} />
-              <Stat label="Est. cost" value={money(cur.sms_cost.estimate)} sub={`@ ${money(cur.sms_cost.rate)}/segment · prior ${money(prev.sms_cost.estimate)}`} />
+              <Stat label="Messages (in + out)" value={num(cur.charges.messages)} sub={`prior ${num(prev.charges.messages)}`} />
+              <Stat label="Est. charge" value={usd(cur.charges.amount)} sub={`@ ${rateStr(cur.charges.rate_per_message)}/message · prior ${usd(prev.charges.amount)}`} />
             </div>
-            <p className="muted small">Excludes carrier surcharges, 10DLC fees, MMS and the phone number itself.</p>
+            <p className="muted small">{num(cur.charges.messages_in)} received · {num(cur.charges.messages_out)} sent</p>
+            <p className="small">Includes message carriage, hosting and support.<br />Phone lines and numbers are billed separately by VIA&apos;s carrier.</p>
           </Card>
+          {data.internal && (
+            <Card title="LockStep cost (internal)" className="mg-internal" info="Visible to LockStep only (Chatwoot super admins and LOCKSTEP_INTERNAL_EMAILS); the server never sends these numbers to VIA users. Cost = estimated SMS segments (GSM-7 160/153, Unicode 70/67) × cost rate."
+              csv={() => downloadCsv(`lockstep-internal-cost-${data.range.from}_${data.range.to}.csv`, ['bucket_start_et', 'messages', 'segments', 'revenue_usd', 'cost_usd', 'margin_usd'],
+                [...data.internal!.by_bucket.map((b) => [b.b, b.messages, b.segments, b.revenue.toFixed(2), b.cost.toFixed(2), b.margin.toFixed(2)]),
+                 ['total', cur.charges.messages, data.internal!.current.segments, data.internal!.current.revenue.toFixed(2), data.internal!.current.cost.toFixed(2), data.internal!.current.margin.toFixed(2)]])}>
+              <div className="mg-placeholder">Internal · not shown to VIA</div>
+              <div className="mg-stat-row">
+                <Stat label="Segments (in + out)" value={num(data.internal.current.segments)} sub={`prior ${num(data.internal.previous.segments)}`} />
+                <Stat label="Cost" value={usd(data.internal.current.cost)} sub={`@ ${rateStr(data.internal.cost_rate_per_segment)}/segment · prior ${usd(data.internal.previous.cost)}`} />
+              </div>
+              <div className="mg-stat-row">
+                <Stat label="Revenue" value={usd(data.internal.current.revenue)} sub={`${num(cur.charges.messages)} msgs × ${rateStr(data.internal.revenue_rate_per_message)}`} />
+                <Stat label="Margin" value={usd(data.internal.current.margin)} sub={`${pct(data.internal.current.margin_pct)} · prior ${usd(data.internal.previous.margin)}`} />
+              </div>
+            </Card>
+          )}
           </div>
 
           <p className="mg-foot muted small span3">
@@ -396,7 +419,7 @@ function SettingsSheet({ onClose }: { onClose: (changed: boolean) => void }) {
     if (!s) return;
     try {
       const h = holidays.split(/[\s,]+/).filter(Boolean);
-      await api('/settings', { method: 'PUT', body: { business_hours: { ...s.business_hours, holidays: h }, sms: { rate_per_segment: s.sms.rate_per_segment } } });
+      await api('/settings', { method: 'PUT', body: { business_hours: { ...s.business_hours, holidays: h }, ...(s.can_edit_rates ? { billing: { rate_per_message: s.billing.rate_per_message }, ...(s.internal_cost ? { internal_cost: { rate_per_segment: s.internal_cost.rate_per_segment } } : {}) } : {}) } });
       onClose(true);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
@@ -425,11 +448,15 @@ function SettingsSheet({ onClose }: { onClose: (changed: boolean) => void }) {
             <label className="mg-field">Holidays (closed all day), YYYY-MM-DD, comma separated
               <input value={holidays} onChange={(e) => setHolidays(e.target.value)} placeholder="2026-11-26, 2026-12-25" />
             </label>
-            <div className="mg-sub">SMS cost placeholder</div>
-            <label className="mg-field">Rate per segment (USD)
-              <input type="number" step="0.0001" min="0" value={s.sms.rate_per_segment} onChange={(e) => setS({ ...s, sms: { ...s.sms, rate_per_segment: Number(e.target.value) } })} />
+            <div className="mg-sub">Messaging charge</div>
+            <label className="mg-field">Rate per message (USD){!s.can_edit_rates && ' · set by LockStep'}
+              <input type="number" step="0.001" min="0" value={s.billing.rate_per_message} disabled={!s.can_edit_rates} onChange={(e) => setS({ ...s, billing: { ...s.billing, rate_per_message: Number(e.target.value) } })} />
             </label>
-            <p className="muted small">{s.sms.note}</p>
+            {s.internal_cost && (
+              <label className="mg-field">LockStep cost per segment (USD, internal)
+                <input type="number" step="0.0001" min="0" value={s.internal_cost.rate_per_segment} onChange={(e) => setS({ ...s, internal_cost: { ...s.internal_cost!, rate_per_segment: Number(e.target.value) } })} />
+              </label>
+            )}
             <div className="row-btns"><button className="mg-btn" onClick={() => onClose(false)}>Cancel</button><button className="mg-btn primary" onClick={save}>Save</button></div>
           </>
         )}
