@@ -46,4 +46,4 @@ npm test        # adapter unit tests (vitest)
 npm run build   # static build in dist/
 ```
 
-Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`. The site is marked `noindex,nofollow` and `robots.txt` disallows all crawlers.
+Deployment: GitHub Pages serves the built `dist/` from the `gh-pages` branch. A GitHub Actions workflow (build, test, deploy to Pages) is prepared to replace that once a token with `workflow` scope can push it. The site is marked `noindex,nofollow` and `robots.txt` disallows all crawlers.
