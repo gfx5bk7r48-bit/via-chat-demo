@@ -61,7 +61,7 @@ export interface SdLookup {
   fetched_at?: string;
   /** 'demo' = fixture data for the fake 555-01xx demo customers. */
   source: 'servicedesk' | 'demo';
-  /** Lookup failed (proxy/gateway error). Not the same as found:false. */
+  /** Lookup failed (proxy/upstream error). Not the same as found:false. */
   error?: string;
 }
 
