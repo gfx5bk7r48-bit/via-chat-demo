@@ -35,7 +35,23 @@ draftReply
 
 - `src/data/mockAdapter.ts` is the in-memory store used by this demo. It simulates delivery and read receipts, typing, and inbound texts.
 - `src/data/chatwootAdapter.ts` is a **stub** for a future Chatwoot backend. Each method has a TODO naming the Chatwoot Application API endpoint it maps to (conversations, messages, contacts, canned responses, assignments, toggle_status, update_last_seen) and the ActionCable `RoomChannel` events for live updates.
-- `src/store.ts` is the one line that picks the adapter.
+- `src/data/chatwootAdapter.ts` is the real-backend adapter (see below).
+- `src/store.ts` picks the adapter at build time (`VITE_BACKEND`).
+
+## Real backend build (self-hosted Chatwoot)
+
+The same UI can run against a self-hosted **Chatwoot Community Edition** instead of the mock:
+
+```bash
+VITE_BASE=/via/ VITE_BACKEND=chatwoot npm run build
+```
+
+- Serve that build from the **same origin** as Chatwoot (e.g. `https://<chatwoot-host>/via/`). The public GitHub Pages demo stays on the mock adapter.
+- Each agent signs in with their own Chatwoot email and password (`POST /auth/sign_in`). Only the short-lived session headers are kept, in `sessionStorage`; sign-out revokes them. **No API token is ever compiled into the bundle.**
+- Conversations, messages, sending, private team notes, assignment, resolve/reopen, pin (a `pinned` label), tapbacks (conversation custom attributes, never sent over SMS), team saved replies (Chatwoot canned responses) and per-agent saved replies (stored in the agent's Chatwoot profile settings).
+- Live updates over Chatwoot's ActionCable websocket (`/cable`, `RoomChannel`), with polling every 4 s as a fallback.
+- The customer-phone simulator posts messages into the API inbox **as the contact**, the same way the SMS channel will, and marks agent texts read.
+- Customer panel: ServiceDesk appointments, urgency strip and routing, read from a same-origin `/api/sd/*` proxy once it exists; until then it shows clearly labelled demo data. Morning/afternoon are routing buckets, so customer-facing text never quotes an 8–12 / 12–4 window.
 
 ## Develop
 

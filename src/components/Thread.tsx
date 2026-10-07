@@ -54,7 +54,7 @@ export function Thread(p: Props) {
     setMenu(null);
   };
 
-  const lastOut = [...p.messages].reverse().find((m) => m.direction === 'out');
+  const lastOut = [...p.messages].reverse().find((m) => m.direction === 'out' && !m.note);
   const assignee = p.agents.find((a) => a.id === p.conv.assigneeId);
   const mine = p.agent && p.conv.assigneeId === p.agent.id;
 
@@ -100,6 +100,16 @@ export function Thread(p: Props) {
           const groupedWithPrev = prev && prev.direction === m.direction && m.at - prev.at < GROUP && !showTime;
           const dt = dividerTime(m.at);
           const tbs = m.meta?.tapbacks ?? [];
+          if (m.note) {
+            return (
+              <Fragment key={m.id}>
+                {showTime && <div className="divider"><b>{dt.day}</b> {dt.t}</div>}
+                <div className="note-row" role="note" aria-label={`Private note${m.senderName ? ' from ' + m.senderName : ''}: ${m.text}`}>
+                  <div className="note"><span className="note-tag">Team note{m.senderName ? ` · ${m.senderName}` : ''} · {clock(m.at)} · not sent to customer</span>{m.text}</div>
+                </div>
+              </Fragment>
+            );
+          }
           return (
             <Fragment key={m.id}>
               {showTime && <div className="divider"><b>{dt.day}</b> {dt.t}</div>}
@@ -129,7 +139,7 @@ export function Thread(p: Props) {
               </div>
               {lastOut && m.id === lastOut.id && (
                 <div className="receipt">
-                  {m.status === 'read' && m.readAt ? <><b>Read</b> {clock(m.readAt)}</> : m.status === 'delivered' ? 'Delivered' : m.status === 'failed' ? 'Not Delivered' : 'Sending…'}
+                  {m.status === 'read' && m.readAt ? <><b>Read</b> {clock(m.readAt)}</> : m.status === 'delivered' ? 'Delivered' : m.status === 'failed' ? 'Not Delivered' : m.status === 'sent' ? 'Sent' : 'Sending…'}
                 </div>
               )}
             </Fragment>

@@ -88,7 +88,7 @@ export function CustomerPanel({ open, conv, customer: c, onClose, onInsert, toas
                       const sel = form.slot === d + w;
                       return (
                         <button key={w} disabled={!s.room} className={`slot ${s.room ? '' : 'full'} ${sel ? 'sel' : ''}`}
-                          onClick={() => action === 'book' ? setForm({ ...form, slot: d + w }) : onInsert(`We have an opening ${prettyDate(d)} in the ${w} (${s.label}). Would that work for you?`)}
+                          onClick={() => action === 'book' ? setForm({ ...form, slot: d + w }) : onInsert(`We have an opening ${prettyDate(d)} in the ${w}. We'll text you a 3-hour arrival window the day before. Would that work for you?`)}
                           aria-label={`${prettyDate(d)} ${w}: ${s.room ? s.room + ' open' : 'full'}`}>
                           {s.room ? `${s.room} open` : 'Full'}
                         </button>

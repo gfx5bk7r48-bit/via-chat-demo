@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { adapter } from './store';
+import { adapter, chatwoot, CHATWOOT_BASE } from './store';
+import { loadSession, signOut } from './data/chatwootSession';
 import type { Agent, Conversation, Customer, Message } from './data/types';
 import { Sidebar } from './components/Sidebar';
 import { Thread } from './components/Thread';
 import { CustomerPanel } from './components/CustomerPanel';
+import { SdPanel } from './components/SdPanel';
 import { PhoneSimulator } from './components/PhoneSimulator';
 import { ding } from './util';
 
@@ -12,7 +14,7 @@ export interface Toast { id: number; title: string; body?: string }
 
 export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [agentId, setAgentId] = useState(() => localStorage.getItem('via-chat.agent') || 'a-jamie');
+  const [agentId, setAgentId] = useState(() => chatwoot?.currentAgentId ?? (localStorage.getItem('via-chat.agent') || 'a-jamie'));
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Record<string, Message[]>>({});
@@ -36,11 +38,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    adapter.listAgents().then(setAgents);
+    adapter.listAgents().then(setAgents).catch((e) => toast('Could not load agents', String(e?.message ?? e)));
     adapter.listConversations().then((list) => {
       setConvs(list);
       if (window.innerWidth > 760) setSelectedId((s) => s ?? list[0]?.id ?? null);
-    });
+    }).catch((e) => toast('Could not load conversations', String(e?.message ?? e)));
     return adapter.subscribe((e) => {
       if (e.type === 'conversation') {
         setConvs((cs) => {
@@ -49,8 +51,14 @@ export default function App() {
           return [...next].sort((a, b) => (b.lastMessage?.at ?? Date.now()) - (a.lastMessage?.at ?? Date.now()));
         });
       } else if (e.type === 'message') {
-        setMsgs((m) => (m[e.message.conversationId] ? { ...m, [e.message.conversationId]: [...m[e.message.conversationId], e.message] } : m));
-        if (e.message.direction === 'in') {
+        setMsgs((m) => {
+          const list = m[e.message.conversationId];
+          if (!list) return m;
+          // De-dupe: the real backend echoes our own sends back over the websocket.
+          const i = list.findIndex((x) => x.id === e.message.id);
+          return { ...m, [e.message.conversationId]: i >= 0 ? list.map((x) => (x.id === e.message.id ? e.message : x)) : [...list, e.message] };
+        });
+        if (e.message.direction === 'in' && !e.message.note) {
           if (soundRef.current) ding();
           if (selectedRef.current === e.message.conversationId && document.visibilityState === 'visible') void adapter.markRead(e.message.conversationId);
         }
@@ -69,8 +77,8 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedId) return;
-    adapter.getMessages(selectedId).then((list) => setMsgs((m) => ({ ...m, [selectedId]: list })));
-    void adapter.markRead(selectedId);
+    adapter.getMessages(selectedId).then((list) => setMsgs((m) => ({ ...m, [selectedId]: list }))).catch((e) => toast('Could not load messages', String(e?.message ?? e)));
+    adapter.markRead(selectedId).catch(() => undefined);
   }, [selectedId]);
 
   const phone = selected?.phone;
@@ -112,6 +120,7 @@ export default function App() {
         convs={convs} selectedId={selectedId} onSelect={select} searchRef={searchRef}
         agents={agents} agentId={agentId} onAgent={setAgentId} typing={typing}
         theme={theme} onTheme={cycleTheme} sound={sound} onSound={() => setSound((s) => !s)}
+        signedIn={chatwoot ? { name: chatwoot.currentAgentName, onSignOut: async () => { await signOut(CHATWOOT_BASE, loadSession()); location.reload(); } } : undefined}
       />
       <main className="thread-col" aria-label="Conversation">
         {selected ? (
@@ -127,7 +136,11 @@ export default function App() {
           <div className="empty-thread"><div className="empty-logo">VIA</div><p>Select a conversation</p></div>
         )}
       </main>
-      {selected && (
+      {selected && adapter.getServiceDesk && (
+        <SdPanel open={panelOpen} conv={selected} refreshKey={lastMsgId} onClose={() => setPanelOpen(false)}
+          onInsert={(text) => setComposerInsert({ text, n: Date.now() })} toast={toast} />
+      )}
+      {selected && !adapter.getServiceDesk && (
         <CustomerPanel
           open={panelOpen} conv={selected} customer={customer} onClose={() => setPanelOpen(false)}
           onInsert={(text) => setComposerInsert({ text, n: Date.now() })}

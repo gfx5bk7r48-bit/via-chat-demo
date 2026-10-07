@@ -13,6 +13,8 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
   const [filter, setFilter] = useState('');
   const [active, setActive] = useState(0);
   const [editing, setEditing] = useState<Partial<SavedReply> | null>(null);
+  const [noteMode, setNoteMode] = useState(false);
+  const canNote = typeof adapter.sendNote === 'function';
   const ta = useRef<HTMLTextAreaElement>(null);
   const lastId = messages.at(-1)?.id;
 
@@ -41,6 +43,7 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
     const body = text.trim();
     if (!body || !agent) return;
     setText('');
+    if (noteMode && adapter.sendNote) { await adapter.sendNote(conv.id, body); setNoteMode(false); return; }
     await adapter.sendMessage(conv.id, body, agent.id);
   };
 
@@ -74,7 +77,7 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
     setEditing(null); void loadReplies();
   };
 
-  const showDraft = draft && dismissedFor !== lastId + draft && !text;
+  const showDraft = draft && dismissedFor !== lastId + draft && !text && !noteMode;
   const mineR = shown.filter((r) => r.scope === 'personal');
   const teamR = shown.filter((r) => r.scope === 'team');
 
@@ -130,13 +133,19 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
         </div>
       )}
 
-      <div className="composer">
+      <div className={`composer ${noteMode ? 'note-mode' : ''}`}>
         <button className={`icon-btn plus ${menuOpen ? 'on' : ''}`} onClick={() => { setMenuOpen((o) => !o); setEditing(null); }} aria-label="Saved replies (type / )" aria-expanded={menuOpen} title="Saved replies ( / )">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="currentColor" /></svg>
         </button>
+        {canNote && (
+          <button className={`icon-btn note-btn ${noteMode ? 'on' : ''}`} onClick={() => { setNoteMode((n) => !n); requestAnimationFrame(() => ta.current?.focus()); }}
+            aria-pressed={noteMode} aria-label="Private team note (not sent to the customer)" title="Private team note">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 3h10l4 4v14H5z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /><path d="M8 11h8M8 15h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+          </button>
+        )}
         <div className="field">
           <textarea ref={ta} rows={1} value={text} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey}
-            placeholder={conv.status === 'resolved' ? 'Text Message · reopens conversation' : 'Text Message'} aria-label="Message. Enter to send, Shift+Enter for a new line, / for saved replies" />
+            placeholder={noteMode ? 'Private note · only VIA sees this' : conv.status === 'resolved' ? 'Text Message · reopens conversation' : 'Text Message'} aria-label="Message. Enter to send, Shift+Enter for a new line, / for saved replies" />
           <button className="send" onClick={send} disabled={!text.trim()} aria-label="Send">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>

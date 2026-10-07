@@ -262,3 +262,40 @@ button.primary.small { padding: 4px 10px; font-size: 12px; }
   .conv-scroll { padding-bottom: 80px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- self-hosted (Chatwoot) build ---------- */
+.login { height: 100vh; display: grid; place-items: center; background: var(--side); padding: 16px; }
+.login-card { width: min(360px, 100%); background: var(--bg); border-radius: 16px; box-shadow: var(--shadow); padding: 28px 24px; display: flex; flex-direction: column; gap: 12px; }
+.login-brand { font-weight: 700; font-size: 20px; display: flex; align-items: center; gap: 6px; }
+.login-card label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.login-card input { background: var(--field); border: 0; border-radius: 9px; padding: 9px 10px; font-size: 14px; color: var(--text); }
+.login-card .primary { padding: 10px; border-radius: 10px; font-size: 14px; }
+.login-error { background: var(--chip-red); color: var(--chip-red-t); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.login-foot { text-align: center; margin-top: 4px; }
+.agent-switch.signed-in { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.agent-switch.signed-in span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-btn { background: none; border: 0; color: var(--accent); font-size: 12px; padding: 2px 0; }
+.note-row { display: flex; justify-content: center; margin: 8px 0; }
+.note { max-width: min(520px, 86%); background: var(--chip-amber); color: var(--text); border-radius: 12px; padding: 8px 12px; font-size: 13px; line-height: 1.35; white-space: pre-wrap; border: 1px dashed color-mix(in srgb, var(--chip-amber-t) 45%, transparent); }
+.note-tag { display: block; font-size: 10px; font-weight: 600; color: var(--chip-amber-t); margin-bottom: 2px; text-transform: uppercase; letter-spacing: .03em; }
+.composer.note-mode .field { background: var(--chip-amber); }
+.note-btn.on { color: var(--chip-amber-t); }
+/* ServiceDesk panel */
+.mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+.chip-mono { background: var(--field); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.sd-strip { border-left: 4px solid var(--muted); background: var(--card); border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+.sd-strip.red { border-color: #e8412c; background: var(--chip-red); color: var(--chip-red-t); }
+.sd-strip.amber { border-color: #f0a500; background: var(--chip-amber); color: var(--chip-amber-t); }
+.sd-strip.green { border-color: #2fa84f; background: var(--chip-green); color: var(--chip-green-t); }
+.sd-strip.grey span { color: var(--muted); }
+.sd-warn { background: var(--chip-amber); color: var(--chip-amber-t); border-radius: 8px; padding: 6px 9px; font-size: 12px; margin: 0 0 8px; }
+.sd-next { display: flex; flex-direction: column; gap: 4px; } .sd-next-sub { font-size: 13px; }
+.sd-appt { padding: 6px 0; border-top: 1px solid var(--line); list-style: none; } .sd-appt:first-child { border-top: 0; }
+.sd-appt.past { opacity: .6; } .sd-appt-top { display: flex; justify-content: space-between; gap: 6px; } .sd-appt-sub { font-size: 12px; color: var(--muted); }
+.sd-routing { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.sd-routing li { display: flex; gap: 6px; align-items: center; } .sd-routing li.nb { opacity: .55; }
+.sd-day { width: 64px; flex: none; } .sd-techs { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; } .sd-dot.room { background: #2fa84f; }
+.sd-offer { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.sd-offer-row { display: grid; grid-template-columns: 70px 1fr 1fr; gap: 4px; align-items: center; font-size: 12px; }
+.sd-foot { text-align: center; font-size: 11px; color: var(--muted); margin-top: 6px; } .sd-foot.stale { color: var(--chip-red-t); font-weight: 600; }

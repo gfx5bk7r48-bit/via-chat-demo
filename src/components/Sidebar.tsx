@@ -7,6 +7,8 @@ interface Props {
   convs: Conversation[]; selectedId: string | null; onSelect: (id: string) => void;
   searchRef: RefObject<HTMLInputElement>; agents: Agent[]; agentId: string; onAgent: (id: string) => void;
   typing: Record<string, boolean>; theme: string; onTheme: () => void; sound: boolean; onSound: () => void;
+  /** Real backend: the agent is whoever signed in; no switcher. */
+  signedIn?: { name: string; onSignOut: () => void };
 }
 type Filter = 'open' | 'mine' | 'resolved';
 
@@ -42,12 +44,19 @@ export function Sidebar(p: Props) {
           </button>
         </div>
       </div>
-      <label className="agent-switch">
-        <span className="sr-only">Signed in as</span>
-        <select value={p.agentId} onChange={(e) => p.onAgent(e.target.value)} aria-label="Switch dispatcher">
-          {p.agents.map((a) => <option key={a.id} value={a.id}>{a.name} · Dispatch</option>)}
-        </select>
-      </label>
+      {p.signedIn ? (
+        <div className="agent-switch signed-in">
+          <span title="Signed in with Chatwoot">{p.signedIn.name} · Dispatch</span>
+          <button className="link-btn" onClick={p.signedIn.onSignOut}>Sign out</button>
+        </div>
+      ) : (
+        <label className="agent-switch">
+          <span className="sr-only">Signed in as</span>
+          <select value={p.agentId} onChange={(e) => p.onAgent(e.target.value)} aria-label="Switch dispatcher">
+            {p.agents.map((a) => <option key={a.id} value={a.id}>{a.name} · Dispatch</option>)}
+          </select>
+        </label>
+      )}
       <div className="search">
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="2.4" fill="none" /><path d="M15.5 15.5 21 21" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
         <input ref={p.searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search conversations (Ctrl+K)"

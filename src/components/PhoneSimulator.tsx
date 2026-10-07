@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { adapter, mock } from '../store';
+import { adapter, simulator } from '../store';
 import type { Conversation, Message } from '../data/types';
 import { errorCodePhoto } from '../data/svg';
 import { clock } from '../util';
@@ -17,11 +17,20 @@ export function PhoneSimulator({ open, onToggle, convs }: { open: boolean; onTog
   useEffect(() => { if (!convs.some((c) => c.phone === phone) && phone !== NEW_NUMBER && convs[0]) setPhone(convs[0].phone); }, [convs, phone]);
   useEffect(() => {
     if (!open) return;
-    mock.getMessagesForPhone(phone).then(setList);
-    return adapter.subscribe((e) => {
-      if ((e.type === 'message' || e.type === 'message-updated') && e.message.conversationId === convId) mock.getMessagesForPhone(phone).then(setList);
-      if (e.type === 'conversation' && e.conversation.phone === phone) mock.getMessagesForPhone(phone).then(setList);
+    // Real backend: the pretend phone "reads" our texts a moment after they land (like a Twilio read receipt).
+    let seenT: ReturnType<typeof setTimeout> | undefined;
+    const load = () => simulator.getMessagesForPhone(phone).then((l) => {
+      setList(l);
+      if (simulator.simulateSeen && l.some((m) => m.direction === 'out' && m.status !== 'read')) {
+        clearTimeout(seenT); seenT = setTimeout(() => void simulator.simulateSeen!(phone), 1500);
+      }
     });
+    void load();
+    const unsub = adapter.subscribe((e) => {
+      if ((e.type === 'message' || e.type === 'message-updated') && e.message.conversationId === convId) void load();
+      if (e.type === 'conversation' && e.conversation.phone === phone) void load();
+    });
+    return () => { unsub(); clearTimeout(seenT); };
   }, [open, phone, convId]);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [list.length, open]);
 
@@ -29,13 +38,13 @@ export function PhoneSimulator({ open, onToggle, convs }: { open: boolean; onTog
     const t = text.trim();
     if (!t && !attach) return;
     setText(''); clearTimeout(typingT.current);
-    await mock.simulateInbound(phone, attach ? t : t, attach ? { kind: 'image', url: errorCodePhoto, alt: 'Photo of appliance display with error code' } : undefined);
+    await simulator.simulateInbound(phone, attach ? t : t, attach ? { kind: 'image', url: errorCodePhoto, alt: 'Photo of appliance display with error code' } : undefined);
   };
   const onType = (v: string) => {
     setText(v);
-    mock.simulateTyping(phone, !!v);
+    simulator.simulateTyping(phone, !!v);
     clearTimeout(typingT.current);
-    typingT.current = setTimeout(() => mock.simulateTyping(phone, false), 3000);
+    typingT.current = setTimeout(() => simulator.simulateTyping(phone, false), 3000);
   };
   const known = convs.find((c) => c.phone === phone);
 

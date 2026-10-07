@@ -10,6 +10,7 @@ import type {
   AdapterEvent, Agent, Booking, Conversation, Customer, Draft, Message,
   SavedReply, Slot, Tapback,
 } from './types';
+import type { SdLookup, SdRouting } from './sd';
 
 export type Unsubscribe = () => void;
 
@@ -38,10 +39,24 @@ export interface DataAdapter {
 
   /** Suggest a reply. Must never send anything by itself. */
   draftReply(conversationId: string): Promise<Draft | null>;
+
+  /**
+   * Optional: ServiceDesk context (appointments only), in the shape of the internal customer lookup.
+   * Real backend: same-origin /api/sd/customer proxy, demo fixtures until it exists.
+   */
+  getServiceDesk?(phone: string): Promise<SdLookup>;
+  getRouting?(zip: string): Promise<SdRouting | null>;
+
+  /** Optional: private team note (real backend only). Never sent to the customer. */
+  sendNote?(conversationId: string, text: string): Promise<Message>;
 }
 
 /** Demo-only hooks used by the customer-phone simulator. */
 export interface SimulatorHooks {
   simulateInbound(phone: string, text: string, attachment?: Message['attachment']): Promise<Message>;
   simulateTyping(phone: string, typing: boolean): void;
+  /** The thread as seen from the customer's phone. */
+  getMessagesForPhone(phone: string): Promise<Message[]>;
+  /** Optional: the pretend phone has received/read our texts (real backend only). */
+  simulateSeen?(phone: string): Promise<void>;
 }

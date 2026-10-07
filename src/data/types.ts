@@ -24,6 +24,9 @@ export interface Message {
   attachment?: Attachment;
   agentId?: string;
   meta?: { tapbacks?: Tapback[] };
+  /** Private team note (Chatwoot private message). Never sent to the customer. */
+  note?: boolean;
+  senderName?: string;
 }
 
 export interface Handoff {
