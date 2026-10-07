@@ -45,7 +45,7 @@ export interface DataAdapter {
    * Real backend: same-origin /api/sd/customer proxy, demo fixtures until it exists.
    */
   getServiceDesk?(phone: string): Promise<SdLookup>;
-  getRouting?(zip: string): Promise<SdRouting | null>;
+  getRouting?(zip: string, demoFallback?: boolean): Promise<SdRouting | null>;
 
   /** Optional: private team note (real backend only). Never sent to the customer. */
   sendNote?(conversationId: string, text: string): Promise<Message>;

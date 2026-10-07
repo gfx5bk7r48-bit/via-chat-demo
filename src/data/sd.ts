@@ -33,12 +33,17 @@ export interface SdAppointment {
   hours_until_window: number | null;
   is_past: boolean;
   in_progress: boolean;
+  /** Internal-only fields (staff tool): street address and problem text (max 160 chars). */
+  street?: string;
+  problem?: string;
 }
 export interface SdRoutingDay { day: string; date: string; techs: string; room: boolean; bookable: boolean }
 export interface SdRouting {
   found: boolean; zip: string; zone: string; zone_source?: string;
   offer: { name: 'morning' | 'afternoon'; range: string }[];
   window_note?: string; days: SdRoutingDay[]; suggest?: string; note?: string;
+  /** Set by the client: where this routing block came from. */
+  source?: 'servicedesk' | 'demo';
 }
 export interface SdLookup {
   found: boolean;
@@ -50,11 +55,21 @@ export interface SdLookup {
   repeat_caller?: boolean;
   hours_until_window?: number;
   warning?: string;
-  /** Added by the VIA Chat proxy: when the ServiceDesk batch last ran. */
+  /** Demo fixtures only: simulated time of the last ServiceDesk batch. */
   synced_at?: string;
-  /** 'demo' = fixture data, ServiceDesk not connected. */
+  /** Added by the VIA Chat proxy: when it fetched this answer. */
+  fetched_at?: string;
+  /** 'demo' = fixture data for the fake 555-01xx demo customers. */
   source: 'servicedesk' | 'demo';
+  /** Lookup failed (proxy/gateway error). Not the same as found:false. */
+  error?: string;
 }
+
+/** The fake demo customers all use 555-01xx numbers (reserved for fiction). */
+export const isDemoPhone = (p: string) => /^\d{3}55501\d{2}$/.test(phone10(p));
+
+/** Distinct customer names on one number (shared phones are common; never merge them). */
+export const namesOn = (l: SdLookup | null) => [...new Set((l?.appointments ?? []).map((a) => a.customer_full_name).filter(Boolean))];
 
 /** Raw appointment record (demo fixtures only). */
 export interface SdRawAppointment { invoice: number | string; name: string; date: string; window: string; tech: string; machine: string; city: string; zip: string }
@@ -192,7 +207,8 @@ export function sdDraft(l: SdLookup | null, msgs: Message[]): string | null {
   if (!lastIn || !last || last.direction === 'out') return null;
   const t = (lastIn.text || '').toLowerCase();
   const next = l?.appointments.find((a) => !a.is_past);
-  const first = (next ?? l?.appointments.at(-1))?.customer_first_name;
+  // Shared number with several names: don't guess who we're talking to.
+  const first = namesOn(l).length > 1 ? '' : (next ?? l?.appointments.at(-1))?.customer_first_name;
   const hi = first ? `Hi ${first}, ` : 'Hi! ';
   if (!lastIn.text && lastIn.attachment) return `Thanks for the photo${first ? ', ' + first : ''}! That helps our technician bring the right parts.`;
   if (/resched|move|next week|change|cancel/.test(t)) return `${hi}no problem. I'll ask dispatch to move you. Would a morning or an afternoon work better, and which days are good?`;

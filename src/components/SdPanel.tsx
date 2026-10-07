@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adapter } from '../store';
 import type { Conversation } from '../data/types';
-import { customerWindow, dow as dowShort, longDay, md, verdict, weekday, windowPart, type SdAppointment, type SdLookup, type SdRouting } from '../data/sd';
+import { customerWindow, dow as dowShort, longDay, md, namesOn, verdict, weekday, windowPart, type SdAppointment, type SdLookup, type SdRouting } from '../data/sd';
 import { Avatar } from './Avatar';
 
 interface Props {
@@ -13,10 +13,14 @@ type Action = null | 'eta' | 'offer' | 'book';
 const fullDay = (iso: string) => `${weekday(iso)} ${md(iso)}`;
 const minsAgo = (iso?: string) => (iso ? Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000)) : null);
 
-function ApptRow({ a }: { a: SdAppointment }) {
+const titleCase = (s?: string) => (s ?? '').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+function ApptRow({ a, showName }: { a: SdAppointment; showName: boolean }) {
   return (
     <li className={`sd-appt ${a.is_past ? 'past' : ''}`}>
+      {showName && <div className="sd-appt-name">{a.customer_full_name}</div>}
       <div className="sd-appt-top"><b>{a.appliance || 'Appliance n/a'}</b><span className="mono chip-mono">{a.window}</span></div>
+      {a.problem && <div className="sd-appt-sub sd-problem">{a.problem}</div>}
       <div className="sd-appt-sub">
         {a.when} · {a.tech_assigned ? <>tech <span className="mono">{a.tech}</span></> : <span className="muted">unassigned</span>} · inv <span className="mono">{a.invoice}</span>
       </div>
@@ -43,16 +47,18 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
     return () => { live = false; };
   }, [conv.phone, refreshKey]);
   useEffect(() => {
-    if (/^\d{5}$/.test(zip) && zip !== routing?.zip) adapter.getRouting?.(zip).then(setRouting);
+    if (/^\d{5}$/.test(zip) && zip !== routing?.zip) adapter.getRouting?.(zip, sd?.source === 'demo').then(setRouting);
   }, [zip]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 30_000); return () => clearInterval(t); }, []);
 
   const v = verdict(sd);
-  const names = [...new Set((sd?.appointments ?? []).map((a) => a.customer_full_name))];
+  const names = namesOn(sd);
+  const live = sd?.source === 'servicedesk';
+  const checked = minsAgo(sd?.fetched_at);
   const head = sd?.appointments.at(-1);
   const first = (v.appt ?? head)?.customer_first_name;
   const synced = minsAgo(sd?.synced_at);
-  const stale = synced != null && synced > 45;
+  const stale = !!sd?.warning || (!live && synced != null && synced > 45);
 
   const eta = (m: number) => { onInsert(`${first ? `Hi ${first}, ` : 'Hi! '}your VIA technician is on the way and should arrive in about ${m} minutes.`); setAction(null); };
   // Customer-facing offers never quote the 8-12 / 12-4 buckets.
@@ -63,7 +69,7 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
   const doBook = async () => {
     if (!book.date || !book.window || !book.appliance) return;
     const { callsheetId } = await adapter.bookAppointment({ conversationId: conv.id, date: book.date, window: book.window, appliance: book.appliance, issue: book.issue });
-    toast(`Demo callsheet ${callsheetId} noted`, 'Private note added. Nothing was sent to ServiceDesk.');
+    toast(`Demo booking ${callsheetId} noted`, 'Private note added. Nothing was sent to ServiceDesk.');
     setAction(null); setBook({ date: '', window: '', appliance: '', issue: '' });
     adapter.getServiceDesk?.(conv.phone).then(setSd);
   };
@@ -74,9 +80,9 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
         <button className="panel-close" onClick={onClose} aria-label="Close customer panel">Done</button>
         <div className="panel-hero">
           <Avatar name={conv.name || head?.customer_full_name} phone={conv.phone} size={64} />
-          <h2>{conv.name || head?.customer_full_name || 'Unknown customer'}</h2>
+          <h2>{conv.name || (names.length === 1 ? head?.customer_full_name : '') || (names.length > 1 ? 'Shared number' : 'Unknown customer')}</h2>
           <div className="muted">{conv.phone}</div>
-          {head && <div className="muted small">{head.city ? head.city.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) + ' · ' : ''}<span className="mono">{head.zip}</span></div>}
+          {head && <div className="muted small">{head.city ? titleCase(head.city) + ' · ' : ''}<span className="mono">{head.zip}</span></div>}
         </div>
 
         <div className={`sd-strip ${v.tone}`} role="status">
@@ -84,8 +90,12 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
           {v.appt && <span>{dowShort(v.appt.date)} {md(v.appt.date)}{v.appt.tech_assigned ? ` · tech ${v.appt.tech}` : ' · tech unassigned'}</span>}
           {sd?.called_recently && <span className="chip">Called recently</span>}
         </div>
-        {names.length > 1 && <p className="sd-warn">Several names on this number ({names.join(' / ')}). Confirm who you're texting.</p>}
-        {sd?.warning && <p className="sd-warn">{sd.warning}</p>}
+        {names.length > 1 && (
+          <div className="sd-warn"><b>{names.length} names on this number.</b> Confirm who you&apos;re texting.
+            <ul className="sd-names">{names.map((n) => <li key={n}>{n}</li>)}</ul></div>
+        )}
+        {sd?.warning && <p className="sd-warn stale">⚠ {sd.warning}</p>}
+        {sd?.error && <p className="sd-warn stale">{sd.error}</p>}
 
         <div className="actions">
           <button className={action === 'eta' ? 'on' : ''} onClick={() => setAction(action === 'eta' ? null : 'eta')}><span>⏱</span>Send ETA</button>
@@ -121,7 +131,7 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
               <div className="book-form">
                 <input placeholder="Appliance" value={book.appliance} onChange={(e) => setBook({ ...book, appliance: e.target.value })} aria-label="Appliance" />
                 <input placeholder="Problem" value={book.issue} onChange={(e) => setBook({ ...book, issue: e.target.value })} aria-label="Problem" />
-                <button className="primary" disabled={!book.date || !book.window || !book.appliance} onClick={doBook}>Add demo callsheet note</button>
+                <button className="primary" disabled={!book.date || !book.window || !book.appliance} onClick={doBook}>Add demo booking note</button>
                 <p className="muted small">Demo: writes a private note only. Nothing is sent to ServiceDesk; real callsheets aren&apos;t enabled from VIA Chat yet.</p>
               </div>
             )}
@@ -134,22 +144,25 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
             <div className="sd-next">
               <div className="appt-day">{longDay(v.appt.date)}</div>
               <div><span className="mono chip-mono">{v.appt.window}</span>{!v.appt.window_time_known && <span className="muted small"> routes not built yet</span>}</div>
+              {names.length > 1 && <div className="sd-next-sub"><b>{v.appt.customer_full_name}</b></div>}
+              {v.appt.street && <div className="sd-next-sub">{titleCase(v.appt.street)}{v.appt.city ? `, ${titleCase(v.appt.city)}` : ''} <span className="mono">{v.appt.zip}</span></div>}
               <div className="sd-next-sub">{v.appt.appliance}</div>
+              {v.appt.problem && <div className="sd-next-sub sd-problem">“{v.appt.problem}”</div>}
               <div className="sd-next-sub">{v.appt.tech_assigned ? <>Tech <span className="mono">{v.appt.tech}</span></> : 'Tech unassigned'} · Invoice <span className="mono">{v.appt.invoice}</span></div>
               {!v.appt.is_past && <div className="muted small">Tell the customer: “{customerWindow(v.appt)}”{windowPart(v.appt.window).exact ? '' : ' (the 8-12 / 12-4 code is a routing bucket, not their window)'}</div>}
             </div>
-          ) : <p className="muted">{sd ? 'No appointment on file' : 'Looking up…'}</p>}
+          ) : <p className="muted">{!sd ? 'Looking up…' : sd.error ? 'Lookup unavailable' : 'No appointment on file'}</p>}
         </section>
 
         {(sd?.appointments.length ?? 0) > 0 && (
           <section className="card">
             <div className="card-h">Appointments on this number <span className="count">{sd!.appointments.length}</span></div>
-            <ul className="jobs">{[...sd!.appointments].reverse().map((a) => <ApptRow key={`${a.invoice}-${a.date}`} a={a} />)}</ul>
+            <ul className="jobs">{[...sd!.appointments].reverse().map((a) => <ApptRow key={`${a.invoice}-${a.date}`} a={a} showName={names.length > 1} />)}</ul>
           </section>
         )}
 
         <section className="card">
-          <div className="card-h">Routing{routing ? <span>Zone <span className="mono">{routing.zone}</span> · <span className="mono">{routing.zip}</span></span> : null}</div>
+          <div className="card-h">Routing{routing?.source === 'demo' ? ' (demo)' : ''}{routing ? <span>Zone <span className="mono">{routing.zone}</span> · <span className="mono">{routing.zip}</span></span> : null}</div>
           {routing ? (
             <ul className="sd-routing">
               {routing.days.map((d) => (
@@ -160,8 +173,11 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
                 </li>
               ))}
             </ul>
-          ) : <p className="muted">No ZIP on file</p>}
-          {routing && <p className="muted small">booked/capacity per tech · dot = room (worth proposing, not a booking)</p>}
+          ) : <p className="muted">{zip.length === 5 ? 'Checking ZIP…' : 'No ZIP on file'}</p>}
+          {action !== 'offer' && action !== 'book' && (
+            <label className="zip">ZIP <input className="mono" value={zip} inputMode="numeric" maxLength={5} onChange={(e) => setZip(e.target.value.replace(/\D/g, ''))} aria-label="Routing ZIP" /></label>
+          )}
+          {routing && <p className="muted small">booked/capacity per tech · dot = room (worth proposing, not a booking){routing.source === 'servicedesk' ? ' · live' : ''}</p>}
         </section>
 
         <section className="card sd-stub">
@@ -170,8 +186,11 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
         </section>
 
         <p className={`sd-foot ${stale ? 'stale' : ''}`}>
-          ServiceDesk · {synced == null ? 'sync time unknown' : `synced ${synced} min ago`}
-          {sd?.source === 'demo' && <><br /><b>DEMO DATA</b> · ServiceDesk not connected · fictional customers</>}
+          {live ? (
+            <>ServiceDesk · live · {sd?.warning ? 'index is stale (see warning)' : 'synced within the last 45 min'}{checked != null ? ` · checked ${checked ? `${checked} min ago` : 'just now'}` : ''}</>
+          ) : sd ? (
+            <>ServiceDesk · {synced == null ? 'sync time unknown' : `synced ${synced} min ago`}<br /><b className="demo-badge">DEMO DATA</b> · fictional 555-01xx customer{routing?.source === 'servicedesk' ? ' · routing is live' : ''}</>
+          ) : 'ServiceDesk · looking up…'}
         </p>
       </div>
     </aside>

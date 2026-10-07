@@ -16,20 +16,21 @@
  *   pin            POST .../conversations/:cid/labels {labels:[..., "pinned"]}
  *   tapbacks       POST .../conversations/:cid/custom_attributes  (VIA-only metadata, never sent over SMS)
  *   contacts       GET  .../contacts/search?q=
- *   ServiceDesk    GET  /api/sd/customer?phone=  (same-origin proxy, NOT built yet -> demo fixtures in the real shape)
+ *   ServiceDesk    POST /api/sd/customer {phone}, POST /api/sd/availability {zip}
+ *                  (same-origin server-side proxy; it checks the agent's Chatwoot session.
+ *                  Fake 555-01xx demo customers use labelled fixtures instead.)
  *   team replies   GET  .../canned_responses
  *   personal replies  stored per agent in the Chatwoot user's ui_settings (GET/PUT /api/v1/profile)
  *   realtime       ActionCable RoomChannel at wss://<host>/cable, polling fallback every 4 s
  *
  * Not Chatwoot features, still demo stand-ins until the VIA Chat API exists:
- *   routing/availability (demo per ZIP), callsheet booking (private note only,
- *   nothing reaches ServiceDesk), AI draft (template).
+ *   booking (private note only, nothing reaches ServiceDesk), AI draft (template).
  */
 import type { DataAdapter, SimulatorHooks, Unsubscribe } from './adapter';
 import type {
   AdapterEvent, Agent, Booking, Conversation, Customer, Draft, Message, MessageStatus, SavedReply, Slot, Tapback,
 } from './types';
-import { demoRouting, demoSyncedAt, deriveLookup, dow, md, phone10, sdDraft, type SdLookup, type SdRawAppointment, type SdRouting } from './sd';
+import { demoRouting, demoSyncedAt, deriveLookup, dow, isDemoPhone, md, phone10, sdDraft, type SdLookup, type SdRawAppointment, type SdRouting } from './sd';
 import { ChatwootCable } from './cable';
 import { authHeaders, clearSession, type ChatwootSession } from './chatwootSession';
 
@@ -285,32 +286,68 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
     const r = await this.req('GET', this.acct(`/contacts/search?q=${encodeURIComponent(e164.replace('+', ''))}&include_contacts=true`));
     return (r?.payload ?? []).find((c: Raw) => (c.phone_number ?? '') === e164) ?? null;
   }
-  private sdDownUntil = 0;
-  private async sdProxy<T>(path: string): Promise<T | null> {
-    if (!this.session || Date.now() < this.sdDownUntil) return null;
+  /** POST to the same-origin ServiceDesk proxy (phone numbers never go in URLs). */
+  private async sdProxy<T>(path: string, body: Record<string, string>): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+    if (!this.session) return { ok: false, error: 'Not signed in' };
     try {
-      const r = await fetch(`${this.cfg.baseUrl}/api/sd${path}`, { headers: { Accept: 'application/json', ...authHeaders(this.session) }, credentials: 'omit' });
-      if (r.status === 501 || r.status === 404) { this.sdDownUntil = Date.now() + 5 * 60_000; return null; } // proxy not connected yet; re-check in 5 min
-      if (!r.ok) return null;
-      return (await r.json()) as T;
-    } catch { return null; }
+      const r = await fetch(`${this.cfg.baseUrl}/api/sd${path}`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...authHeaders(this.session) },
+        body: JSON.stringify(body),
+        credentials: 'omit',
+      });
+      if (r.ok) return { ok: true, data: (await r.json()) as T };
+      if (r.status === 401) return { ok: false, error: 'Not authorized for ServiceDesk lookups' };
+      if (r.status === 429) return { ok: false, error: 'Too many lookups, try again in a minute' };
+      return { ok: false, error: `ServiceDesk lookup unavailable (${r.status})` };
+    } catch { return { ok: false, error: 'ServiceDesk lookup unavailable (network)' }; }
   }
-  async getServiceDesk(phone: string): Promise<SdLookup> {
+  /** Short client-side memo so the panel, composer draft and header share one lookup per open. */
+  private sdMemo = new Map<string, { at: number; p: Promise<unknown> }>();
+  private memo<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+    const hit = this.sdMemo.get(key);
+    if (hit && Date.now() - hit.at < ttlMs) return hit.p as Promise<T>;
+    const p = fn().catch((e) => { this.sdMemo.delete(key); throw e; });
+    this.sdMemo.set(key, { at: Date.now(), p });
+    if (this.sdMemo.size > 200) this.sdMemo.delete(this.sdMemo.keys().next().value!);
+    return p;
+  }
+  getServiceDesk(phone: string): Promise<SdLookup> {
+    return this.memo(`c:${phone10(phone) || phone}`, 30_000, () => this.lookupServiceDesk(phone));
+  }
+  private async lookupServiceDesk(phone: string): Promise<SdLookup> {
     const p10 = phone10(phone);
-    const live = p10 ? await this.sdProxy<SdLookup>(`/customer?phone=${p10}`) : null;
-    if (live) return { ...live, source: 'servicedesk' };
     const contact = await this.findContact(phone).catch(() => null);
-    const fx = parseJSON<{ zip?: string; appointments?: SdRawAppointment[] }>(contact?.custom_attributes?.sd_demo_json, {});
-    const zip = fx.zip ?? fx.appointments?.at(-1)?.zip;
-    const lookup = deriveLookup(fx.appointments ?? [], zip ? demoRouting(zip) : undefined);
-    lookup.synced_at = demoSyncedAt();
+    let lookup: SdLookup;
+    const demoJson = contact?.custom_attributes?.sd_demo_json;
+    if (isDemoPhone(phone) && demoJson) {
+      // Clearly labelled demo fixtures, ONLY for the seeded fake 555-01xx demo customers.
+      // Any other number (including a 555-01xx number with no fixture) is looked up live.
+      const fx = parseJSON<{ zip?: string; appointments?: SdRawAppointment[] }>(demoJson, {});
+      const zip = fx.zip ?? fx.appointments?.at(-1)?.zip;
+      lookup = deriveLookup(fx.appointments ?? [], zip ? (await this.getRouting(zip, true)) ?? undefined : undefined);
+      lookup.synced_at = demoSyncedAt();
+    } else if (!p10) {
+      lookup = { found: false, priority: 'none', in_progress: false, appointments: [], source: 'servicedesk', error: 'Not a 10-digit US number' };
+    } else {
+      const r = await this.sdProxy<SdLookup>('/customer', { phone: p10 });
+      lookup = r.ok
+        ? { ...r.data, appointments: r.data.appointments ?? [], source: 'servicedesk', routing: r.data.routing ? { ...r.data.routing, source: 'servicedesk' } : undefined }
+        : { found: false, priority: 'none', in_progress: false, appointments: [], source: 'servicedesk', error: r.error };
+    }
     const entry = this.customers.get(phone);
     this.customers.set(phone, { contact, customer: entry?.customer ?? this.toCustomer(phone, contact, lookup), lookup });
     return lookup;
   }
-  async getRouting(zip: string): Promise<SdRouting | null> {
-    if (!/^\d{5}$/.test(zip)) return null;
-    return (await this.sdProxy<SdRouting>(`/availability?zip=${zip}`)) ?? demoRouting(zip);
+  /** Live routing for a ZIP. `demoFallback` is only used for the fake demo customers. */
+  getRouting(zip: string, demoFallback = false): Promise<SdRouting | null> {
+    if (!/^\d{5}$/.test(zip)) return Promise.resolve(null);
+    return this.memo(`z:${zip}:${demoFallback}`, 30_000, () => this.fetchRouting(zip, demoFallback));
+  }
+  private async fetchRouting(zip: string, demoFallback: boolean): Promise<SdRouting | null> {
+    const r = await this.sdProxy<SdRouting>('/availability', { zip });
+    if (r.ok && r.data?.found !== false && Array.isArray(r.data?.days)) return { ...r.data, source: 'servicedesk' };
+    return demoFallback ? { ...demoRouting(zip), source: 'demo' } : null;
   }
   private toCustomer(phone: string, contact: Raw | null, l: SdLookup): Customer {
     const a = l.appointments.at(-1);
@@ -326,7 +363,7 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
   }
   async getAvailability(zip: string): Promise<Slot[]> {
     // Legacy slot shape for the old panel. The SD panel uses getRouting() instead.
-    const r = await this.getRouting(zip);
+    const r = await this.getRouting(zip, true);
     return (r?.days ?? []).filter((d) => d.bookable).flatMap((d) => (['morning', 'afternoon'] as const).map((w) => ({ date: d.date, window: w, label: w, room: d.room ? 1 : 0 })));
   }
   async bookAppointment(b: Booking): Promise<{ callsheetId: string }> {
@@ -334,10 +371,11 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
     // so this only records a private note + updates the demo fixture.
     const callsheetId = 'DEMO-' + Math.floor(100000 + Math.random() * 900000);
     const conv = this.convs.get(b.conversationId);
-    await this.sendNote(b.conversationId, `📅 Demo callsheet ${callsheetId} (NOT sent to ServiceDesk): ${b.appliance}${b.issue ? ' — ' + b.issue : ''} · ${b.date} ${b.window} · dispatch sets the 3-hour window the day before`);
+    await this.sendNote(b.conversationId, `📅 Demo booking ${callsheetId} (private note, NOT sent to ServiceDesk): ${b.appliance}${b.issue ? ' — ' + b.issue : ''} · ${b.date} ${b.window} · dispatch sets the 3-hour window the day before`);
     if (conv) {
       const contact = this.customers.get(conv.phone)?.contact ?? (await this.findContact(conv.phone));
-      if (contact) {
+      // Only the seeded demo customers carry a fixture; live contacts get the private note only.
+      if (contact && isDemoPhone(conv.phone) && contact.custom_attributes?.sd_demo_json) {
         const a = contact.custom_attributes ?? {};
         const fx = parseJSON<{ zip?: string; appointments?: SdRawAppointment[] }>(a.sd_demo_json, {});
         const prev = fx.appointments?.at(-1);
@@ -349,6 +387,7 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
         const custom = { ...a, sd_demo_json: JSON.stringify({ ...fx, appointments: [...(fx.appointments ?? []), appt] }) };
         await this.req('PUT', this.acct(`/contacts/${contact.id}`), { custom_attributes: custom });
         this.customers.delete(conv.phone);
+        this.sdMemo.delete(`c:${phone10(conv.phone) || conv.phone}`);
       }
     }
     return { callsheetId };

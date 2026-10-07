@@ -51,7 +51,7 @@ VITE_BASE=/via/ VITE_BACKEND=chatwoot npm run build
 - Conversations, messages, sending, private team notes, assignment, resolve/reopen, pin (a `pinned` label), tapbacks (conversation custom attributes, never sent over SMS), team saved replies (Chatwoot canned responses) and per-agent saved replies (stored in the agent's Chatwoot profile settings).
 - Live updates over Chatwoot's ActionCable websocket (`/cable`, `RoomChannel`), with polling every 4 s as a fallback.
 - The customer-phone simulator posts messages into the API inbox **as the contact**, the same way the SMS channel will, and marks agent texts read.
-- Customer panel: ServiceDesk appointments, urgency strip and routing, read from a same-origin `/api/sd/*` proxy once it exists; until then it shows clearly labelled demo data. Morning/afternoon are routing buckets, so customer-facing text never quotes an 8–12 / 12–4 window.
+- Customer panel: ServiceDesk appointments (with street and problem), urgency strip and routing, read live from a same-origin server-side `/api/sd/*` proxy that checks the agent's Chatwoot session (phone lookups are POST only, never in a URL). Numbers on file under several names list every name. The seeded fake customers (555-01xx numbers) keep clearly labelled DEMO fixtures. "Book (demo)" only adds a private note. Morning/afternoon are routing buckets, so customer-facing text never quotes an 8–12 / 12–4 window.
 
 ## Develop
 

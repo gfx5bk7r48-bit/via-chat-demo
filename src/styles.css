@@ -299,3 +299,8 @@ button.primary.small { padding: 4px 10px; font-size: 12px; }
 .sd-offer { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .sd-offer-row { display: grid; grid-template-columns: 70px 1fr 1fr; gap: 4px; align-items: center; font-size: 12px; }
 .sd-foot { text-align: center; font-size: 11px; color: var(--muted); margin-top: 6px; } .sd-foot.stale { color: var(--chip-red-t); font-weight: 600; }
+.sd-warn.stale { background: var(--chip-red); color: var(--chip-red-t); }
+.sd-names { margin: 4px 0 0; padding-left: 16px; } .sd-names li { margin: 1px 0; }
+.sd-appt-name { font-size: 12px; font-weight: 600; }
+.sd-problem { color: var(--muted); font-style: italic; font-size: 12px; }
+.demo-badge { background: var(--chip-amber); color: var(--chip-amber-t); border-radius: 5px; padding: 0 5px; }
