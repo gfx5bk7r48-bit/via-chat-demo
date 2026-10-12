@@ -370,3 +370,6 @@ button.primary.small { padding: 4px 10px; font-size: 12px; }
 .tl details p { margin: 4px 0; background: var(--card); border-radius: 6px; padding: 6px 8px; }
 .consent-card .row-btns { display: flex; gap: 6px; margin-top: 6px; }
 .consent-card .row-btns button { font-size: 12px; }
+
+.inbox-pick { display: block; margin: 0 14px 8px; } .inbox-pick select { width: 100%; border: 0; border-radius: 8px; padding: 5px 8px; background: var(--field); font-size: 12px; }
+.mini.twilio { background: var(--chip-green); color: var(--chip-green-t); }

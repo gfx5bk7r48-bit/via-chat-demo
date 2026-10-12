@@ -69,7 +69,7 @@ export function Thread(p: Props) {
         <div className="who">
           <Avatar name={p.conv.name} phone={p.conv.phone} size={30} />
           <div><div className="who-name">{p.conv.name || p.conv.phone}</div>
-            <div className="who-sub">{p.conv.name ? p.conv.phone + ' · ' : ''}SMS{assignee ? ` · ${assignee.name}` : ' · Unassigned'}</div></div>
+            <div className="who-sub">{p.conv.name ? p.conv.phone + ' · ' : ''}{p.conv.inboxName ?? 'SMS'}{assignee ? ` · ${assignee.name}` : ' · Unassigned'}</div></div>
           {consentEnabled && consent.check?.enforced !== false && <ConsentPill status={consent.check?.status ?? null} onClick={() => openConsent(p.conv, 'history')} compact />}
         </div>
         <div className="head-actions">

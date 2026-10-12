@@ -78,6 +78,11 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
   private msgConv = new Map<string, string>();
   private customers = new Map<string, { contact: Raw | null; customer: Customer; lookup?: SdLookup }>();
   private inboxId: number | null = null;
+  private inboxNames = new Map<number, string>();
+  private async loadInboxes() {
+    if (this.inboxNames.size) return;
+    try { const r = await this.req('GET', this.acct('/inboxes')); for (const i of (r?.payload ?? []) as Raw[]) this.inboxNames.set(i.id as number, String(i.name)); } catch { /* names are cosmetic */ }
+  }
   private seen = new Set<string>();
   private cable: ChatwootCable | null = null;
   private poll: ReturnType<typeof setInterval> | undefined;
@@ -172,6 +177,8 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
       unread: c.unread_count ?? prev?.unread ?? 0,
       status: c.status === 'resolved' ? 'resolved' : 'open',
       assigneeId: c.meta && 'assignee' in c.meta ? (c.meta.assignee?.id != null ? String(c.meta.assignee.id) : null) : prev?.assigneeId ?? null,
+      inboxId: c.inbox_id != null ? String(c.inbox_id) : prev?.inboxId,
+      inboxName: (c.inbox_id != null ? this.inboxNames.get(c.inbox_id) : undefined) ?? prev?.inboxName,
       lastMessage: last && (!prev?.lastMessage || last.at >= prev.lastMessage.at) ? last : prev?.lastMessage ?? last,
     };
     this.convs.set(id, conv);
@@ -196,6 +203,7 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
    * so a long history (e.g. the demo seed) doesn't mean dozens of sequential requests.
    */
   async listConversations(): Promise<Conversation[]> {
+    await this.loadInboxes();
     const pageOf = (status: string, page: number) =>
       this.req('GET', this.acct(`/conversations?status=${status}&assignee_type=all&sort_by=last_activity_at_desc&page=${page}`)) as Promise<Raw>;
     const fetchStatus = async (status: string, maxPages: number): Promise<Raw[]> => {
@@ -552,7 +560,8 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
   // Posts messages into the API inbox as the CONTACT (message_type "incoming"),
   // which is exactly what the Twilio SMS channel will do once it is connected.
   private convForPhone(phone: string): Conversation | undefined {
-    const all = [...this.convs.values()].filter((c) => c.phone === phone);
+    // Simulator only: stay in the demo (API) inbox, never a real Twilio inbox.
+    const all = [...this.convs.values()].filter((c) => c.phone === phone && (!this.inboxId || !c.inboxId || c.inboxId === String(this.inboxId)));
     return all.find((c) => c.status === 'open') ?? all.sort((a, b) => (b.lastMessage?.at ?? 0) - (a.lastMessage?.at ?? 0))[0];
   }
   private async smsInboxId(): Promise<number> {

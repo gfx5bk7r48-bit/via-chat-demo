@@ -19,9 +19,12 @@ type Filter = 'open' | 'mine' | 'resolved';
 export function Sidebar(p: Props) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>('open');
+  const [inbox, setInbox] = useState('');
+  const inboxes = useMemo(() => [...new Map(p.convs.filter((c) => c.inboxId).map((c) => [c.inboxId!, c.inboxName ?? `Inbox ${c.inboxId}`])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [p.convs]);
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return p.convs.filter((c) => {
+      if (inbox && c.inboxId !== inbox) return false;
       if (needle) {
         const digits = needle.replace(/\D/g, '');
         return (c.name ?? '').toLowerCase().includes(needle) || (digits && c.phone.replace(/\D/g, '').includes(digits)) || (c.lastMessage?.text ?? '').toLowerCase().includes(needle);
@@ -30,7 +33,7 @@ export function Sidebar(p: Props) {
       if (filter === 'resolved') return c.status === 'resolved';
       return c.status === 'open';
     });
-  }, [p.convs, q, filter, p.agentId]);
+  }, [p.convs, q, filter, p.agentId, inbox]);
   const pinned = !q && filter === 'open' ? shown.filter((c) => c.pinned) : [];
   const rest = !q && filter === 'open' ? shown.filter((c) => !c.pinned) : shown;
   // Unread badge = open conversations only (a long resolved history shouldn't inflate it).
@@ -78,6 +81,14 @@ export function Sidebar(p: Props) {
           </button>
         ))}
       </div>
+      {inboxes.length > 1 && (
+        <label className="inbox-pick" {...tip('Inbox', 'Show conversations from one inbox only')}>
+          <select value={inbox} onChange={(e) => setInbox(e.target.value)} aria-label="Inbox">
+            <option value="">All inboxes</option>
+            {inboxes.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+        </label>
+      )}
       <div className="conv-scroll">
         {pinned.length > 0 && (
           <div className="pinned" aria-label="Pinned">
@@ -101,9 +112,10 @@ export function Sidebar(p: Props) {
                   <span className="conv-prev">
                     {p.typing[c.id] ? <em>typing…</em> : c.lastMessage ? (c.lastMessage.direction === 'out' ? 'You: ' : '') + (c.lastMessage.text || '📷 Photo') : 'No messages'}
                   </span>
-                  {(c.handoff || c.assigneeId) && (
+                  {(c.handoff || c.assigneeId || /twilio/i.test(c.inboxName ?? '')) && (
                     <span className="conv-tags">
                       {c.handoff && <span className="mini ray">Ray handoff</span>}
+                      {/twilio/i.test(c.inboxName ?? '') && <span className="mini twilio">Twilio test</span>}
                       {c.assigneeId && <span className="mini">{p.agents.find((a) => a.id === c.assigneeId)?.name}</span>}
                     </span>
                   )}

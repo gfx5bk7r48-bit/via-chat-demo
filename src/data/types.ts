@@ -48,6 +48,9 @@ export interface Conversation {
   assigneeId: string | null;
   lastMessage?: Message;
   handoff?: Handoff;
+  /** Real backend: which Chatwoot inbox (e.g. "VIA SMS (demo)" vs "VIA SMS (Twilio test)"). */
+  inboxId?: string;
+  inboxName?: string;
 }
 
 export interface Job {
