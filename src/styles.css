@@ -330,3 +330,43 @@ button.primary.small { padding: 4px 10px; font-size: 12px; }
 @media (hover: none) { .tooltip { display: none; } }
 @media (prefers-reduced-motion: reduce) { .tooltip { animation: none; } }
 .mg-loading { display: grid; place-items: center; height: 100%; color: var(--muted); }
+
+/* SMS consent */
+.consent-pill { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 12px; padding: 3px 9px; font-size: 11px; font-weight: 600; white-space: nowrap; background: var(--field); color: var(--text); margin-left: 8px; flex: 0 0 auto; }
+.consent-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.consent-pill.opted_in { background: var(--chip-green); color: var(--chip-green-t); }
+.consent-pill.implied { background: var(--chip-blue); color: var(--chip-blue-t); }
+.consent-pill.opted_out { background: var(--chip-red); color: var(--chip-red-t); }
+.consent-pill.unknown, .consent-pill.review { background: var(--chip-amber); color: var(--chip-amber-t); }
+.consent-pill.loading { color: var(--muted); }
+.card-h .consent-pill { margin-left: auto; }
+.consent-banner { display: flex; align-items: center; gap: 8px; margin: 0 12px 6px; padding: 8px 10px; border-radius: 10px; font-size: 13px; line-height: 1.35; border-left: 4px solid; }
+.consent-banner.red { background: var(--chip-red); color: var(--chip-red-t); border-color: #d32228; font-weight: 600; }
+.consent-banner.amber { background: var(--chip-amber); color: var(--chip-amber-t); border-color: #f0a500; }
+.consent-banner.warn { font-weight: 400; }
+.consent-banner .cb-text { flex: 1; }
+.consent-banner .tiny { color: inherit; text-decoration: underline; }
+.cb-urgent { display: inline-flex; gap: 4px; align-items: center; font-weight: 600; white-space: nowrap; }
+.disclosure-hint { margin: -2px 14px 8px; font-size: 11px; color: var(--muted); }
+.composer textarea:disabled { opacity: .6; cursor: not-allowed; }
+.modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 60; display: flex; align-items: center; justify-content: center; animation: fade .15s; }
+.modal { background: var(--bg); color: var(--text); border-radius: 16px; box-shadow: var(--shadow); width: min(520px, 94vw); max-height: 86vh; overflow: auto; padding: 16px 18px; }
+.modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; } .modal-head > div { flex: 1; } .modal-head h2 { font-size: 17px; margin: 0; }
+.seg { display: flex; background: var(--field); border-radius: 9px; padding: 2px; gap: 2px; margin-bottom: 12px; }
+.seg button { flex: 1; border: 0; background: none; border-radius: 7px; padding: 5px 8px; font-size: 12px; font-weight: 500; }
+.seg button.on { background: var(--bg); box-shadow: 0 1px 3px rgba(0,0,0,.15); } .seg button:disabled { opacity: .4; }
+.consent-form { display: flex; flex-direction: column; gap: 10px; }
+.consent-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; }
+.consent-form input, .consent-form select, .consent-form textarea { font-weight: 400; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; background: var(--bg); }
+.consent-form button { border: 0; border-radius: 8px; padding: 8px 12px; background: var(--field); font-weight: 600; }
+.consent-form button.primary { background: var(--accent); color: #fff; } .consent-form button.danger { background: #d32228; color: #fff; }
+.consent-form button:disabled { opacity: .45; }
+.consent-err { background: var(--chip-red); color: var(--chip-red-t); border-radius: 8px; padding: 6px 9px; font-size: 12px; margin: 0 0 8px; }
+.timeline { list-style: none; margin: 6px 0 10px; padding: 0 0 0 14px; border-left: 2px solid var(--line); }
+.tl { position: relative; padding: 0 0 12px 8px; }
+.tl::before { content: ''; position: absolute; left: -21px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); border: 2px solid var(--bg); }
+.tl.opt_in::before, .tl.re_opt_in::before { background: #2fa84f; } .tl.opt_out::before { background: #d32228; } .tl.help::before { background: #0a7cff; } .tl.review::before { background: #f0a500; }
+.tl-top { display: flex; justify-content: space-between; gap: 8px; }
+.tl details p { margin: 4px 0; background: var(--card); border-radius: 6px; padding: 6px 8px; }
+.consent-card .row-btns { display: flex; gap: 6px; margin-top: 6px; }
+.consent-card .row-btns button { font-size: 12px; }

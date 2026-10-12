@@ -126,3 +126,12 @@
 .mg-stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .mg-stack > .mg-card { flex: 1 1 auto; }
 .mg-card.mg-internal { border-style: dashed; border-color: color-mix(in srgb, #ff9f0a 55%, var(--line)); }
+
+/* SMS consent section */
+.mg-consent-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.mg-consent-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.mg-consent-export { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; }
+.mg-consent-export label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.mg-consent-export input, .mg-consent-export select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 7px; background: var(--bg); color: var(--text); }
+.mg-field.row { flex-direction: row; align-items: center; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 1100px) { .mg-consent-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .mg-consent-cols { grid-template-columns: 1fr; } }

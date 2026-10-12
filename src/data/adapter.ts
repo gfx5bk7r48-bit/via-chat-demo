@@ -13,12 +13,14 @@ import type {
 import type { SdLookup, SdRouting } from './sd';
 
 export type Unsubscribe = () => void;
+/** urgent: agent marked a quiet-hours send as urgent (server-side consent guard decides). */
+export interface SendOptions { urgent?: boolean }
 
 export interface DataAdapter {
   listAgents(): Promise<Agent[]>;
   listConversations(): Promise<Conversation[]>;
   getMessages(conversationId: string): Promise<Message[]>;
-  sendMessage(conversationId: string, text: string, agentId: string): Promise<Message>;
+  sendMessage(conversationId: string, text: string, agentId: string, opts?: SendOptions): Promise<Message>;
   markRead(conversationId: string): Promise<void>;
   subscribe(listener: (e: AdapterEvent) => void): Unsubscribe;
 

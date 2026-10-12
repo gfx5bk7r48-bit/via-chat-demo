@@ -5,6 +5,8 @@ import type { Agent, Conversation, Customer, Message, Tapback } from '../data/ty
 import { Avatar } from './Avatar';
 import { Composer } from './Composer';
 import { clock, dividerTime } from '../util';
+import { ConsentPill, openConsent, useConsent } from './Consent';
+import { consentEnabled } from '../data/consent';
 
 export const TAPBACKS: { k: Tapback; icon: string; label: string }[] = [
   { k: 'heart', icon: '❤️', label: 'Heart' },
@@ -55,6 +57,7 @@ export function Thread(p: Props) {
     setMenu(null);
   };
 
+  const consent = useConsent(p.conv, p.messages.at(-1)?.id);
   const lastOut = [...p.messages].reverse().find((m) => m.direction === 'out' && !m.note);
   const assignee = p.agents.find((a) => a.id === p.conv.assigneeId);
   const mine = p.agent && p.conv.assigneeId === p.agent.id;
@@ -67,6 +70,7 @@ export function Thread(p: Props) {
           <Avatar name={p.conv.name} phone={p.conv.phone} size={30} />
           <div><div className="who-name">{p.conv.name || p.conv.phone}</div>
             <div className="who-sub">{p.conv.name ? p.conv.phone + ' · ' : ''}SMS{assignee ? ` · ${assignee.name}` : ' · Unassigned'}</div></div>
+          {consentEnabled && consent.check?.enforced !== false && <ConsentPill status={consent.check?.status ?? null} onClick={() => openConsent(p.conv, 'history')} compact />}
         </div>
         <div className="head-actions">
           {!mine && p.agent && (
@@ -160,7 +164,7 @@ export function Thread(p: Props) {
         )}
       </div>
 
-      <Composer conv={p.conv} agent={p.agent} customer={p.customer} messages={p.messages} insert={p.insert} />
+      <Composer conv={p.conv} agent={p.agent} customer={p.customer} messages={p.messages} insert={p.insert} consent={consent.check} toast={p.toast} />
 
       {lightbox?.attachment && (
         <div className="lightbox" role="dialog" aria-label="Photo" onClick={() => setLightbox(null)}>

@@ -26,7 +26,7 @@
  * Not Chatwoot features, still demo stand-ins until the VIA Chat API exists:
  *   booking (private note only, nothing reaches ServiceDesk), AI draft (template).
  */
-import type { DataAdapter, SimulatorHooks, Unsubscribe } from './adapter';
+import type { DataAdapter, SendOptions, SimulatorHooks, Unsubscribe } from './adapter';
 import type {
   AdapterEvent, Agent, Booking, Conversation, Customer, Draft, Message, MessageStatus, SavedReply, Slot, Tapback,
 } from './types';
@@ -116,8 +116,9 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
     if (r.status === 401) { clearSession(); this.onUnauthorized(); throw new Error('Session expired, please sign in again'); }
     if (!r.ok) {
       let msg = `${method} ${url.replace(this.cfg.baseUrl, '')} failed (${r.status})`;
-      try { const j = await r.json(); msg = j.message ?? j.error ?? j.errors?.[0] ?? msg; } catch { /* ignore */ }
-      throw new Error(String(msg));
+      let code: string | undefined;
+      try { const j = await r.json(); msg = j.message ?? j.error ?? j.errors?.[0] ?? msg; code = j.code; } catch { /* ignore */ }
+      throw Object.assign(new Error(String(msg)), { status: r.status, code });
     }
     const text = await r.text();
     return (text ? JSON.parse(text) : null) as T;
@@ -234,8 +235,9 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
     return true;
   }
 
-  private async post(conversationId: string, text: string, priv: boolean): Promise<Message> {
-    const raw = await this.req('POST', this.acct(`/conversations/${conversationId}/messages`), { content: text, message_type: 'outgoing', private: priv });
+  private async post(conversationId: string, text: string, priv: boolean, opts?: SendOptions): Promise<Message> {
+    // Customer-facing sends pass the server-side consent guard (infra/consent); via_urgent is read there, ignored by Chatwoot.
+    const raw = await this.req('POST', this.acct(`/conversations/${conversationId}/messages`), { content: text, message_type: 'outgoing', private: priv, ...(opts?.urgent ? { via_urgent: true } : {}) });
     const m = this.mapMessage(raw, conversationId);
     if (this.remember(m)) this.emit({ type: 'message', message: m });
     const c = this.convs.get(conversationId);
@@ -246,7 +248,7 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
     }
     return m;
   }
-  sendMessage(conversationId: string, text: string, _agentId: string) { return this.post(conversationId, text, false); }
+  sendMessage(conversationId: string, text: string, _agentId: string, opts?: SendOptions) { return this.post(conversationId, text, false, opts); }
   /** Private note: visible to VIA agents only, never sent to the customer. */
   sendNote(conversationId: string, text: string) { return this.post(conversationId, text, true); }
 

@@ -8,6 +8,8 @@ import { CustomerPanel } from './components/CustomerPanel';
 import { SdPanel } from './components/SdPanel';
 import { PhoneSimulator } from './components/PhoneSimulator';
 import { ding } from './util';
+import { ConsentDialogHost } from './components/Consent';
+import { consentEnabled } from './data/consent';
 import { TooltipLayer } from './components/Tooltip';
 import { checkManager } from './data/events';
 
@@ -154,6 +156,7 @@ export default function App() {
       )}
       <PhoneSimulator open={simOpen} onToggle={() => setSimOpen((o) => !o)} convs={convs} />
       <TooltipLayer />
+      {consentEnabled && <ConsentDialogHost toast={toast} />}
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className="toast"><strong>{t.title}</strong>{t.body && <span>{t.body}</span>}</div>

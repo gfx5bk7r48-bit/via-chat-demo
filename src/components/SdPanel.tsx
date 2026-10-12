@@ -5,6 +5,8 @@ import { customerWindow, dow as dowShort, longDay, md, namesOn, verdict, weekday
 import { Avatar } from './Avatar';
 import { tip } from './Tooltip';
 import { track } from '../data/events';
+import { ConsentPill, openConsent, useConsent } from './Consent';
+import { consentEnabled, fmtWhen, STATUS_HINT, SOURCE_LABEL } from '../data/consent';
 
 interface Props {
   open: boolean; conv: Conversation; refreshKey?: string; onClose: () => void;
@@ -38,6 +40,7 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
   const [action, setAction] = useState<Action>(null);
   const [book, setBook] = useState({ date: '', window: '' as '' | 'morning' | 'afternoon', appliance: '', issue: '' });
   const [, tick] = useState(0);
+  const consent = useConsent(conv, refreshKey);
 
   useEffect(() => { setAction(null); setSd(null); }, [conv.id]);
   useEffect(() => {
@@ -140,6 +143,21 @@ export function SdPanel({ open, conv, refreshKey, onClose, onInsert, toast }: Pr
               </div>
             )}
           </div>
+        )}
+
+        {consentEnabled && consent.check?.enforced !== false && (
+          <section className="card consent-card" aria-label="SMS consent">
+            <div className="card-h">SMS consent <ConsentPill status={consent.check?.status ?? null} onClick={() => openConsent(conv, 'history')} /></div>
+            {consent.check ? (
+              <p className="muted small">{STATUS_HINT[consent.check.status]}
+                {consent.check.derived.basis && consent.check.status !== 'unknown' ? ` ${SOURCE_LABEL[consent.check.derived.basis.source] ?? consent.check.derived.basis.source}, ${fmtWhen(consent.check.derived.basis.occurred_at)}.` : ''}
+                {consent.check.decision.quiet.quiet ? ` Quiet hours now (${consent.check.decision.quiet.local_time} for the customer).` : ''}</p>
+            ) : <p className="muted small">{consent.error ?? 'Checking…'}</p>}
+            <div className="row-btns">
+              <button onClick={() => openConsent(conv, 'history')} {...tip('View History', 'Every opt-in, opt-out and HELP for this number')}>View history</button>
+              <button onClick={() => openConsent(conv, 'record')} {...tip('Record Consent', 'Log how the customer agreed to texts, or that they asked you to stop')}>Record consent</button>
+            </div>
+          </section>
         )}
 
         <section className="card">

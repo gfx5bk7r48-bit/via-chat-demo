@@ -3,10 +3,12 @@ import { adapter } from '../store';
 import type { Agent, Conversation, Customer, Message, SavedReply } from '../data/types';
 import { track } from '../data/events';
 import { tip } from './Tooltip';
+import { ConsentBanner } from './Consent';
+import { checkConsent, consentChanged, type ConsentCheck } from '../data/consent';
 
-interface Props { conv: Conversation; agent?: Agent; customer: Customer | null; messages: Message[]; insert: { text: string; n: number } | null }
+interface Props { conv: Conversation; agent?: Agent; customer: Customer | null; messages: Message[]; insert: { text: string; n: number } | null; consent?: ConsentCheck | null; toast?: (t: string, b?: string) => void }
 
-export function Composer({ conv, agent, customer, messages, insert }: Props) {
+export function Composer({ conv, agent, customer, messages, insert, consent: consentBase, toast }: Props) {
   const [text, setText] = useState('');
   const [draft, setDraft] = useState<string | null>(null);
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
@@ -17,6 +19,14 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
   const [editing, setEditing] = useState<Partial<SavedReply> | null>(null);
   const [noteMode, setNoteMode] = useState(false);
   const canNote = typeof adapter.sendNote === 'function';
+  // SMS consent: the server enforces this on every send; the UI mirrors its verdict so agents see why.
+  const [urgent, setUrgent] = useState(false);
+  const [urgentCheck, setUrgentCheck] = useState<ConsentCheck | null>(null);
+  useEffect(() => { setUrgent(false); setUrgentCheck(null); }, [conv.id]);
+  useEffect(() => { if (urgent) checkConsent(conv.id, { urgent: true }).then(setUrgentCheck).catch(() => setUrgentCheck(null)); else setUrgentCheck(null); }, [urgent, conv.id, consentBase]);
+  const consent = urgent && urgentCheck ? urgentCheck : consentBase ?? null;
+  const blocked = !!consent?.enforced && !consent.decision.allowed;
+  const disclosureNext = !!consent?.enforced && consent.decision.allowed && consent.decision.needs_disclosure && consent.decision.disclosure_mode === 'append' ? consent.decision.disclosure_text : null;
   const ta = useRef<HTMLTextAreaElement>(null);
   const lastId = messages.at(-1)?.id;
   // AI suggestion usage tracking (enums only; never the text itself)
@@ -47,10 +57,19 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
   const send = async () => {
     const body = text.trim();
     if (!body || !agent) return;
+    if (noteMode && adapter.sendNote) { setText(''); await adapter.sendNote(conv.id, body); setNoteMode(false); return; }
+    if (blocked) return;
     setText('');
-    if (noteMode && adapter.sendNote) { await adapter.sendNote(conv.id, body); setNoteMode(false); return; }
     const s = fromSuggestion.current; fromSuggestion.current = null;
-    await adapter.sendMessage(conv.id, body, agent.id);
+    try {
+      await adapter.sendMessage(conv.id, body, agent.id, urgent ? { urgent: true } : undefined);
+    } catch (e) {
+      const err = e as Error & { code?: string; status?: number };
+      setText(body);
+      if (err.status === 403) { toast?.('Not sent', err.message); consentChanged(); } else toast?.('Could not send', err.message);
+      return;
+    } finally { if (urgent) setUrgent(false); }
+    if (disclosureNext) consentChanged();
     if (s) track('ai_suggestion_sent', conv.id, { modified: body !== s.text.trim(), via: s.via });
   };
 
@@ -95,6 +114,7 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
 
   return (
     <div className="composer-wrap">
+      {!noteMode && <ConsentBanner conv={conv} check={consent} urgent={urgent} onUrgent={setUrgent} />}
       {showDraft && (
         <div className="suggest" role="region" aria-label="AI suggested reply">
           <span className="ai-tag" {...tip('AI Suggestion', 'Generated draft. Review before sending')} tabIndex={0}>✦ AI</span>
@@ -157,12 +177,18 @@ export function Composer({ conv, agent, customer, messages, insert }: Props) {
         )}
         <div className="field">
           <textarea ref={ta} rows={1} value={text} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey}
-            placeholder={noteMode ? 'Private note · only VIA sees this' : conv.status === 'resolved' ? 'Text Message · reopens conversation' : 'Text Message'} aria-label="Message. Enter to send, Shift+Enter for a new line, / for saved replies" />
-          <button className="send" onClick={send} disabled={!text.trim()} {...tip(noteMode ? 'Add Note' : 'Send', 'Enter')}>
+            disabled={blocked && !noteMode}
+            placeholder={noteMode ? 'Private note · only VIA sees this' : blocked ? (consent?.decision.code === 'opted_out' ? 'Texting blocked: customer opted out · team notes still work' : 'Can’t text yet · see above · team notes still work') : conv.status === 'resolved' ? 'Text Message · reopens conversation' : 'Text Message'} aria-label="Message. Enter to send, Shift+Enter for a new line, / for saved replies" />
+          <button className="send" onClick={send} disabled={!text.trim() || (blocked && !noteMode)} {...tip(noteMode ? 'Add Note' : 'Send', 'Enter')}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
       </div>
+      {disclosureNext && !noteMode && (
+        <div className="disclosure-hint" {...tip('Opt-out Notice', 'Added once per number every 12 months (manager setting). Carriers expect it on the first text')} tabIndex={0}>
+          First text to this number in 12 months. VIA adds: <i>“{disclosureNext}”</i>
+        </div>
+      )}
     </div>
   );
 }

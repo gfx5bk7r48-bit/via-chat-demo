@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, HttpError, type Live, type Meta, type Overview, type Settings, type Kpis } from './api';
+import { ConsentSection, ConsentSettingsFields, consentApi, type ConsentSettings } from './ConsentSection';
 import { addDays, bucketLabel, delta, downloadCsv, dur, etStamp, maskPhone, num, pct, prettyDay, rateStr, todayET, usd, DOW, hourLabel } from './format';
 import { HBars, Heatmap, SplitBar, TimeChart } from './charts';
 import { Logo } from '../components/Logo';
@@ -316,6 +317,8 @@ export default function Manage({ onSignedOut }: { onSignedOut: () => void }) {
           )}
           </div>
 
+          <ConsentSection />
+
           <p className="mg-foot muted small span3">
             All times Eastern. Comparison = the same number of days immediately before. Data: Chatwoot (read-only) + VIA Chat usage events. Computed in {data.compute_ms} ms, cached ≤ 60 s.
           </p>
@@ -414,10 +417,13 @@ function SettingsSheet({ onClose }: { onClose: (changed: boolean) => void }) {
   const [s, setS] = useState<Settings | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [holidays, setHolidays] = useState('');
+  const [cs, setCs] = useState<ConsentSettings | null>(null);
   useEffect(() => { api<Settings>('/settings').then((x) => { setS(x); setHolidays((x.business_hours.holidays ?? []).join(', ')); }).catch((e) => setErr(String(e.message))); }, []);
+  useEffect(() => { consentApi<ConsentSettings>('/settings').then(setCs).catch(() => setCs(null)); }, []);
   const save = async () => {
     if (!s) return;
     try {
+      if (cs) await consentApi('/settings', { method: 'PUT', body: { quiet_hours: cs.quiet_hours, disclosure: { mode: cs.disclosure.mode, interval_days: cs.disclosure.interval_days, text: cs.disclosure.text }, natural_language_optout: cs.natural_language_optout } });
       const h = holidays.split(/[\s,]+/).filter(Boolean);
       await api('/settings', { method: 'PUT', body: { business_hours: { ...s.business_hours, holidays: h }, ...(s.can_edit_rates ? { billing: { rate_per_message: s.billing.rate_per_message }, ...(s.internal_cost ? { internal_cost: { rate_per_segment: s.internal_cost.rate_per_segment } } : {}) } : {}) } });
       onClose(true);
@@ -457,6 +463,7 @@ function SettingsSheet({ onClose }: { onClose: (changed: boolean) => void }) {
                 <input type="number" step="0.0001" min="0" value={s.internal_cost.rate_per_segment} onChange={(e) => setS({ ...s, internal_cost: { ...s.internal_cost!, rate_per_segment: Number(e.target.value) } })} />
               </label>
             )}
+            {cs && <ConsentSettingsFields value={cs} onChange={setCs} />}
             <div className="row-btns"><button className="mg-btn" onClick={() => onClose(false)}>Cancel</button><button className="mg-btn primary" onClick={save}>Save</button></div>
           </>
         )}

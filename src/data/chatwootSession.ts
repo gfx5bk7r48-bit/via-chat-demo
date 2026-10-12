@@ -39,15 +39,22 @@ export function authHeaders(s: ChatwootSession): Record<string, string> {
   return { 'access-token': s.accessToken, client: s.client, uid: s.uid, expiry: s.expiry, 'token-type': s.tokenType || 'Bearer' };
 }
 
-export async function signIn(baseUrl: string, email: string, password: string): Promise<ChatwootSession> {
+export async function signIn(baseUrl: string, email: string, password: string, revokeSessionId?: number): Promise<ChatwootSession> {
   const r = await fetch(`${baseUrl}/auth/sign_in`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ...(revokeSessionId ? { revoke_session_id: revokeSessionId } : {}) }),
     credentials: 'omit',
   });
   let body: any = null;
   try { body = await r.json(); } catch { /* non-JSON error */ }
+  // Chatwoot 4.x caps concurrent sessions per user and answers a browser sign-in with 409 + a session
+  // picker once the cap is hit. Do what Chatwoot does for API clients: sign out the least recently used
+  // session and retry once.
+  if (r.status === 409 && body?.sessions_limit_reached && !revokeSessionId) {
+    const oldest = [...(body.sessions ?? [])].sort((a: any, b: any) => Date.parse(a.last_activity_at ?? a.created_at ?? 0) - Date.parse(b.last_activity_at ?? b.created_at ?? 0))[0];
+    if (oldest?.id) return signIn(baseUrl, email, password, oldest.id);
+  }
   if (!r.ok) {
     if (r.status === 429) throw new Error("Too many sign-in attempts. Please wait a few minutes and try again.");
     const msg = body?.errors?.[0] ?? body?.error ?? body?.message ?? `Sign-in failed (${r.status})`;
