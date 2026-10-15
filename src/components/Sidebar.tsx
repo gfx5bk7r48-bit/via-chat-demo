@@ -108,7 +108,7 @@ export function Sidebar(p: Props) {
         <ul className="conv-list">
           {rest.map((c) => (
             <li key={c.id}>
-              <button className={`conv ${c.id === p.selectedId ? 'sel' : ''} ${isPriority(c) ? 'prio' : ''}`} onClick={() => p.onSelect(c.id)} aria-current={c.id === p.selectedId}>
+              <button className={`conv ${c.id === p.selectedId ? 'sel' : ''} ${isPriority(c) ? 'prio' : ''} ${c.priority === 'urgent' ? 'urgent' : ''}`} onClick={() => p.onSelect(c.id)} aria-current={c.id === p.selectedId}>
                 <span className={`dot ${c.unread ? 'on' : ''}`} aria-label={c.unread ? 'Unread' : undefined} />
                 <Avatar name={c.name} phone={c.phone} size={40} />
                 <span className="conv-body">

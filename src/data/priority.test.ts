@@ -15,5 +15,6 @@ describe('priority', () => {
     expect(priorityText({ priority: 'high', apptAt: '2026-10-16T16:00:00Z' })).toBe('Priority · appt Fri 12:00 PM');
     expect(priorityText({ priority: 'urgent' })).toBe('Urgent');
     expect(isPriority({ priority: 'medium' })).toBe(false);
+    expect(isPriority({ priority: null, apptAt: '2026-10-16T12:00:00Z' })).toBe(true);
   });
 });

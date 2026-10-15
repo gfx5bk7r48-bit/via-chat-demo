@@ -376,9 +376,26 @@ button.primary.small { padding: 4px 10px; font-size: 12px; }
 /* Appointment-within-24h / manual priority */
 .mini.prio { background: var(--chip-red); color: var(--chip-red-t); font-weight: 600; }
 .mini.prio.urgent { background: #d92d20; color: #fff; }
-.conv.prio:not(.sel) { box-shadow: inset 3px 0 0 var(--chip-red-t); }
 .prio-badge { display: inline-block; margin-left: 8px; vertical-align: 1px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 6px; background: var(--chip-red); color: var(--chip-red-t); }
 .prio-badge.urgent { background: #d92d20; color: #fff; }
 .prio-btn.on { color: var(--chip-red-t); background: var(--chip-red); }
 .seg-count { margin-left: 4px; font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 8px; background: var(--chip-red); color: var(--chip-red-t); }
 .pin-prio { color: var(--chip-red-t); margin-right: 3px; font-size: 9px; vertical-align: 1px; }
+
+/* Priority rows in the conversation list: red tint + left bar + red name (badge stays for non-colour cue).
+   Text contrast: light #b42318 on #fff0ee ≈ 6:1; dark #ff9b90 on #3a1a17 ≈ 7:1; selected white on #b42318 ≈ 6.5:1. */
+:root { --prio-bg: #fff0ee; --prio-bg-h: #ffe2de; --prio-bg-u: #ffe0db; --prio-bg-uh: #ffd0c9; --prio-bar: #e5484d; --prio-bar-u: #c4161c; --prio-t: #b42318; --prio-sel: #b42318; --prio-sel-u: #8f130d; }
+:root[data-theme="dark"] { --prio-bg: #2f1715; --prio-bg-h: #3a1c19; --prio-bg-u: #3e1714; --prio-bg-uh: #4a1b17; --prio-bar: #ff6b5e; --prio-bar-u: #ff4433; --prio-t: #ff9b90; --prio-sel: #a3261b; --prio-sel-u: #8a160d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --prio-bg: #2f1715; --prio-bg-h: #3a1c19; --prio-bg-u: #3e1714; --prio-bg-uh: #4a1b17; --prio-bar: #ff6b5e; --prio-bar-u: #ff4433; --prio-t: #ff9b90; --prio-sel: #a3261b; --prio-sel-u: #8a160d; } }
+.conv.prio { background: var(--prio-bg); box-shadow: inset 4px 0 0 var(--prio-bar); padding-left: 8px; margin: 2px 0; }
+.conv.prio:hover { background: var(--prio-bg-h); }
+.conv.prio .conv-name { color: var(--prio-t); }
+.conv.prio .conv-body { border-color: transparent; }
+.conv.prio.urgent { background: var(--prio-bg-u); box-shadow: inset 6px 0 0 var(--prio-bar-u); }
+.conv.prio.urgent:hover { background: var(--prio-bg-uh); }
+.conv.prio.urgent .conv-name { font-weight: 700; }
+.conv.prio.sel { background: var(--prio-sel); box-shadow: inset 4px 0 0 #fff6; }
+.conv.prio.urgent.sel { background: var(--prio-sel-u); box-shadow: inset 6px 0 0 #fff8; }
+.conv.prio.sel .conv-name { color: #fff; }
+.conv.prio.sel .mini.prio { background: #fff; color: var(--prio-sel); }
+.conv.prio:focus-visible { outline: 2px solid var(--prio-bar-u); outline-offset: 1px; }

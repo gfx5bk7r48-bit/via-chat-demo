@@ -4,8 +4,9 @@
 import type { Conversation } from './types';
 
 export const APPT_LABEL = 'appt-24h';
-export const priorityRank = (c: Pick<Conversation, 'priority'>) => (c.priority === 'urgent' ? 2 : c.priority === 'high' ? 1 : 0);
-export const isPriority = (c: Pick<Conversation, 'priority'>) => priorityRank(c) > 0;
+export const priorityRank = (c: Pick<Conversation, 'priority' | 'apptAt'>) => (c.priority === 'urgent' ? 2 : c.priority === 'high' || c.apptAt ? 1 : 0);
+/** Priority = Chatwoot priority high/urgent, or the appt-24h label (apptAt is only set when the label is present). */
+export const isPriority = (c: Pick<Conversation, 'priority' | 'apptAt'>) => priorityRank(c) > 0;
 
 /** "Fri 8:00 AM" in Eastern time (internal/staff display; the server stores the window start). */
 export function apptLabel(iso?: string): string {
