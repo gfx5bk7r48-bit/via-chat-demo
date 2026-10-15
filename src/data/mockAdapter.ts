@@ -114,6 +114,7 @@ export class MockAdapter implements DataAdapter, SimulatorHooks {
   async assign(conversationId: string, agentId: string | null) { return this.patchConv(conversationId, { assigneeId: agentId }); }
   async setStatus(conversationId: string, status: 'open' | 'resolved') { return this.patchConv(conversationId, { status }); }
   async togglePin(conversationId: string) { return this.patchConv(conversationId, { pinned: !this.conv(conversationId).pinned }); }
+  async setPriority(conversationId: string, on: boolean) { return this.patchConv(conversationId, on ? { priority: 'high' } : { priority: null, apptAt: undefined }); }
   async setTapback(messageId: string, tapback: Tapback | null): Promise<Message> {
     // VIA-only metadata. NOT sent over SMS — the customer never sees tapbacks.
     for (const list of this.messages.values()) {

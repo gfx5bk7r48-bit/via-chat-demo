@@ -7,6 +7,7 @@ import { Composer } from './Composer';
 import { clock, dividerTime } from '../util';
 import { ConsentPill, openConsent, useConsent } from './Consent';
 import { consentEnabled } from '../data/consent';
+import { isPriority, priorityText } from '../data/priority';
 
 export const TAPBACKS: { k: Tapback; icon: string; label: string }[] = [
   { k: 'heart', icon: '❤️', label: 'Heart' },
@@ -68,7 +69,7 @@ export function Thread(p: Props) {
         <button className="back" onClick={p.onBack} {...tip('Back to Conversations')}>‹<span>Chats</span></button>
         <div className="who">
           <Avatar name={p.conv.name} phone={p.conv.phone} size={30} />
-          <div><div className="who-name">{p.conv.name || p.conv.phone}</div>
+          <div><div className="who-name">{p.conv.name || p.conv.phone}{isPriority(p.conv) && <span className={`prio-badge ${p.conv.priority === 'urgent' ? 'urgent' : ''}`}>{priorityText(p.conv)}</span>}</div>
             <div className="who-sub">{p.conv.name ? p.conv.phone + ' · ' : ''}{p.conv.inboxName ?? 'SMS'}{assignee ? ` · ${assignee.name}` : ' · Unassigned'}</div></div>
           {consentEnabled && consent.check?.enforced !== false && <ConsentPill status={consent.check?.status ?? null} onClick={() => openConsent(p.conv, 'history')} compact />}
         </div>
@@ -81,6 +82,7 @@ export function Thread(p: Props) {
           ) : (
             <button className="pill" onClick={() => adapter.setStatus(p.conv.id, 'open')}>Reopen</button>
           )}
+          {adapter.setPriority && <button className={`icon-btn prio-btn ${isPriority(p.conv) ? 'on' : ''}`} aria-pressed={isPriority(p.conv)} onClick={() => adapter.setPriority!(p.conv.id, !isPriority(p.conv))} {...tip(isPriority(p.conv) ? 'Clear Priority' : 'Mark Priority', isPriority(p.conv) ? 'Removes the flag for everyone (won\u2019t auto-flag this appointment again)' : 'Moves it to the top of everyone\u2019s list')}>⚑</button>}
           <button className="icon-btn pin-btn" onClick={() => adapter.togglePin(p.conv.id)} {...tip(p.conv.pinned ? 'Unpin Conversation' : 'Pin Conversation', p.conv.pinned ? undefined : 'Keeps it at the top of the list')}>📌</button>
           <button className={`icon-btn info ${p.panelOpen ? 'on' : ''}`} onClick={p.onTogglePanel} aria-pressed={p.panelOpen} {...tip('Customer Details', 'Ctrl/⌘+I')}>ⓘ</button>
         </div>

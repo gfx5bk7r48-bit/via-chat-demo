@@ -27,6 +27,8 @@ export interface DataAdapter {
   assign(conversationId: string, agentId: string | null): Promise<Conversation>;
   setStatus(conversationId: string, status: 'open' | 'resolved'): Promise<Conversation>;
   togglePin(conversationId: string): Promise<Conversation>;
+  /** Optional: manually set (high) or clear the priority flag. */
+  setPriority?(conversationId: string, on: boolean): Promise<Conversation>;
   /** VIA-only metadata; never delivered to SMS customers. */
   setTapback(messageId: string, tapback: Tapback | null): Promise<Message>;
 

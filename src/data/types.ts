@@ -51,6 +51,10 @@ export interface Conversation {
   /** Real backend: which Chatwoot inbox (e.g. "VIA SMS (demo)" vs "VIA SMS (Twilio test)"). */
   inboxId?: string;
   inboxName?: string;
+  /** Chatwoot conversation priority. 'high' / 'urgent' sort to the top for everyone. */
+  priority?: 'low' | 'medium' | 'high' | 'urgent' | null;
+  /** Start of the ServiceDesk appointment window (ISO) when auto-flagged 'appt-24h'. */
+  apptAt?: string;
 }
 
 export interface Job {

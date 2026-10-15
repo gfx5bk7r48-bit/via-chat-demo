@@ -27,6 +27,7 @@
  *   booking (private note only, nothing reaches ServiceDesk), AI draft (template).
  */
 import type { DataAdapter, SendOptions, SimulatorHooks, Unsubscribe } from './adapter';
+import { APPT_LABEL } from './priority';
 import type {
   AdapterEvent, Agent, Booking, Conversation, Customer, Draft, Message, MessageStatus, SavedReply, Slot, Tapback,
 } from './types';
@@ -179,6 +180,8 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
       assigneeId: c.meta && 'assignee' in c.meta ? (c.meta.assignee?.id != null ? String(c.meta.assignee.id) : null) : prev?.assigneeId ?? null,
       inboxId: c.inbox_id != null ? String(c.inbox_id) : prev?.inboxId,
       inboxName: (c.inbox_id != null ? this.inboxNames.get(c.inbox_id) : undefined) ?? prev?.inboxName,
+      priority: 'priority' in c ? (c.priority ?? null) : prev?.priority ?? null,
+      apptAt: labels.includes(APPT_LABEL) && typeof custom.appt_at === 'string' ? custom.appt_at : undefined,
       lastMessage: last && (!prev?.lastMessage || last.at >= prev.lastMessage.at) ? last : prev?.lastMessage ?? last,
     };
     this.convs.set(id, conv);
@@ -194,7 +197,8 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
   // ---------- conversations / messages ----------
   async listAgents(): Promise<Agent[]> {
     const list: Raw[] = await this.req('GET', this.acct('/agents'));
-    return list.map((a) => ({ id: String(a.id), name: a.available_name || a.name, initials: initialsOf(a.available_name || a.name) }));
+    // Service accounts (e.g. the server-side "VIA Auto-flag" user) aren't dispatchers: never list or assign them.
+    return list.filter((a) => !/@via-chat\.invalid$/i.test(a.email ?? '')).map((a) => ({ id: String(a.id), name: a.available_name || a.name, initials: initialsOf(a.available_name || a.name) }));
   }
 
   /**
@@ -278,6 +282,24 @@ export class ChatwootAdapter implements DataAdapter, SimulatorHooks {
     const labels = this.meta.get(conversationId)?.labels ?? [];
     const next = labels.includes(PIN_LABEL) ? labels.filter((l) => l !== PIN_LABEL) : [...labels, PIN_LABEL];
     await this.req('POST', this.acct(`/conversations/${conversationId}/labels`), { labels: next });
+    return this.refreshConv(conversationId);
+  }
+  async setPriority(conversationId: string, on: boolean): Promise<Conversation> {
+    // Same Chatwoot API the server-side auto-flag and Ray's gateway use. Clearing records which appointment the
+    // agent cleared (appt_cleared_key) so the auto-flag won't re-raise it; a different appointment can.
+    const meta = this.meta.get(conversationId) ?? { labels: [], customAttributes: {}, tapbacks: {} };
+    const custom: Record<string, unknown> = { ...meta.customAttributes };
+    if (on) {
+      await this.req('POST', this.acct(`/conversations/${conversationId}/toggle_priority`), { priority: 'high' });
+      if (!meta.labels.includes(APPT_LABEL)) custom.appt_flag = 'manual';
+    } else {
+      await this.req('POST', this.acct(`/conversations/${conversationId}/toggle_priority`), { priority: null });
+      if (meta.labels.includes(APPT_LABEL)) await this.req('POST', this.acct(`/conversations/${conversationId}/labels`), { labels: meta.labels.filter((l) => l !== APPT_LABEL) });
+      if (custom.appt_key) custom.appt_cleared_key = custom.appt_key;
+      for (const k of ['appt_at', 'appt_end', 'appt_window', 'appt_key']) delete custom[k];
+      custom.appt_flag = 'cleared';
+    }
+    await this.req('POST', this.acct(`/conversations/${conversationId}/custom_attributes`), { custom_attributes: custom });
     return this.refreshConv(conversationId);
   }
   async setTapback(messageId: string, tapback: Tapback | null): Promise<Message> {

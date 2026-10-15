@@ -4,6 +4,7 @@ import { Avatar } from './Avatar';
 import { listTime } from '../util';
 import { tip } from './Tooltip';
 import { Logo } from './Logo';
+import { isPriority, priorityText, sortForList } from '../data/priority';
 
 interface Props {
   convs: Conversation[]; selectedId: string | null; onSelect: (id: string) => void;
@@ -14,7 +15,7 @@ interface Props {
   /** Shown only when the server says this user is a manager (GET /api/analytics/whoami = 200). */
   manageHref?: string;
 }
-type Filter = 'open' | 'mine' | 'resolved';
+type Filter = 'open' | 'priority' | 'mine' | 'resolved';
 
 export function Sidebar(p: Props) {
   const [q, setQ] = useState('');
@@ -29,13 +30,16 @@ export function Sidebar(p: Props) {
         const digits = needle.replace(/\D/g, '');
         return (c.name ?? '').toLowerCase().includes(needle) || (digits && c.phone.replace(/\D/g, '').includes(digits)) || (c.lastMessage?.text ?? '').toLowerCase().includes(needle);
       }
+      if (filter === 'priority') return isPriority(c) && c.status === 'open';
       if (filter === 'mine') return c.assigneeId === p.agentId && c.status === 'open';
       if (filter === 'resolved') return c.status === 'resolved';
       return c.status === 'open';
     });
   }, [p.convs, q, filter, p.agentId, inbox]);
+  const prioCount = useMemo(() => p.convs.filter((c) => isPriority(c) && c.status === 'open' && (!inbox || c.inboxId === inbox)).length, [p.convs, inbox]);
   const pinned = !q && filter === 'open' ? shown.filter((c) => c.pinned) : [];
-  const rest = !q && filter === 'open' ? shown.filter((c) => !c.pinned) : shown;
+  // Priority conversations (appointment within 24h, or flagged by an agent / Ray) sort to the top for everyone.
+  const rest = sortForList(!q && filter === 'open' ? shown.filter((c) => !c.pinned) : shown);
   // Unread badge = open conversations only (a long resolved history shouldn't inflate it).
   const unreadTotal = p.convs.reduce((a, c) => a + (c.unread && c.status !== 'resolved' ? 1 : 0), 0);
 
@@ -75,9 +79,9 @@ export function Sidebar(p: Props) {
         <kbd {...tip('Search shortcut', 'Ctrl/⌘ + K')}>⌘K</kbd>
       </div>
       <div className="segmented" role="tablist" aria-label="Filter">
-        {(['open', 'mine', 'resolved'] as Filter[]).map((f) => (
+        {(['open', 'priority', 'mine', 'resolved'] as Filter[]).map((f) => (
           <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
-            {f === 'open' ? 'Open' : f === 'mine' ? 'Mine' : 'Resolved'}
+            {f === 'open' ? 'Open' : f === 'priority' ? <>Priority{prioCount > 0 && <span className="seg-count">{prioCount}</span>}</> : f === 'mine' ? 'Mine' : 'Resolved'}
           </button>
         ))}
       </div>
@@ -95,7 +99,7 @@ export function Sidebar(p: Props) {
             {pinned.map((c) => (
               <button key={c.id} className={`pin ${c.id === p.selectedId ? 'sel' : ''}`} onClick={() => p.onSelect(c.id)} aria-label={`Pinned: ${c.name ?? c.phone}${c.unread ? ', unread' : ''}`}>
                 <div className="pin-av"><Avatar name={c.name} phone={c.phone} size={56} />{c.unread > 0 && <span className="pin-dot" />}</div>
-                <span className="pin-name">{c.name?.split(' ')[0] ?? c.phone}</span>
+                <span className="pin-name">{isPriority(c) && <span className="pin-prio" aria-label="Priority">●</span>}{c.name?.split(' ')[0] ?? c.phone}</span>
                 {c.unread > 0 && c.lastMessage && <span className="pin-peek">{c.lastMessage.text || 'Photo'}</span>}
               </button>
             ))}
@@ -104,7 +108,7 @@ export function Sidebar(p: Props) {
         <ul className="conv-list">
           {rest.map((c) => (
             <li key={c.id}>
-              <button className={`conv ${c.id === p.selectedId ? 'sel' : ''}`} onClick={() => p.onSelect(c.id)} aria-current={c.id === p.selectedId}>
+              <button className={`conv ${c.id === p.selectedId ? 'sel' : ''} ${isPriority(c) ? 'prio' : ''}`} onClick={() => p.onSelect(c.id)} aria-current={c.id === p.selectedId}>
                 <span className={`dot ${c.unread ? 'on' : ''}`} aria-label={c.unread ? 'Unread' : undefined} />
                 <Avatar name={c.name} phone={c.phone} size={40} />
                 <span className="conv-body">
@@ -112,8 +116,9 @@ export function Sidebar(p: Props) {
                   <span className="conv-prev">
                     {p.typing[c.id] ? <em>typing…</em> : c.lastMessage ? (c.lastMessage.direction === 'out' ? 'You: ' : '') + (c.lastMessage.text || '📷 Photo') : 'No messages'}
                   </span>
-                  {(c.handoff || c.assigneeId || /twilio/i.test(c.inboxName ?? '')) && (
+                  {(c.handoff || c.assigneeId || isPriority(c) || /twilio/i.test(c.inboxName ?? '')) && (
                     <span className="conv-tags">
+                      {isPriority(c) && <span className={`mini prio ${c.priority === 'urgent' ? 'urgent' : ''}`}>{priorityText(c)}</span>}
                       {c.handoff && <span className="mini ray">Ray handoff</span>}
                       {/twilio/i.test(c.inboxName ?? '') && <span className="mini twilio">Twilio test</span>}
                       {c.assigneeId && <span className="mini">{p.agents.find((a) => a.id === c.assigneeId)?.name}</span>}

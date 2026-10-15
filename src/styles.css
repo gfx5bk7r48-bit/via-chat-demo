@@ -373,3 +373,12 @@ button.primary.small { padding: 4px 10px; font-size: 12px; }
 
 .inbox-pick { display: block; margin: 0 14px 8px; } .inbox-pick select { width: 100%; border: 0; border-radius: 8px; padding: 5px 8px; background: var(--field); font-size: 12px; }
 .mini.twilio { background: var(--chip-green); color: var(--chip-green-t); }
+/* Appointment-within-24h / manual priority */
+.mini.prio { background: var(--chip-red); color: var(--chip-red-t); font-weight: 600; }
+.mini.prio.urgent { background: #d92d20; color: #fff; }
+.conv.prio:not(.sel) { box-shadow: inset 3px 0 0 var(--chip-red-t); }
+.prio-badge { display: inline-block; margin-left: 8px; vertical-align: 1px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 6px; background: var(--chip-red); color: var(--chip-red-t); }
+.prio-badge.urgent { background: #d92d20; color: #fff; }
+.prio-btn.on { color: var(--chip-red-t); background: var(--chip-red); }
+.seg-count { margin-left: 4px; font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 8px; background: var(--chip-red); color: var(--chip-red-t); }
+.pin-prio { color: var(--chip-red-t); margin-right: 3px; font-size: 9px; vertical-align: 1px; }
